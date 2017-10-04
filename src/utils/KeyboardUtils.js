@@ -21,6 +21,29 @@ export const keyToDegree = {
   ']': 10,
 };
 
+export const keyToPosition = {
+  'q': 0,
+  '2': 0.5,
+  'w': 1,
+  '3': 1.5,
+  'e': 2,
+  'r': 3,
+  '5': 3.5,
+  't': 4,
+  '6': 4.5,
+  'y': 5,  // A 440
+  '7': 5.5,
+  'u': 6,
+  'i': 7,
+  '9': 7.5,
+  'o': 8,
+  '0': 8.5,
+  'p': 9,
+  '[': 10,
+  '=': 10.5,
+  ']': 11,
+};
+
 export function getDegreeForKey(key) {
   return keyToDegree[key];
 }

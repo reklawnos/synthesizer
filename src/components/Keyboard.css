@@ -1,0 +1,21 @@
+.key {
+  width: 25px;
+  height: 25px;
+  display: inline-block;
+  vertical-align: top;
+  text-align: center;
+  padding: 5px;
+}
+
+.key--white {
+  border: 1px solid black;
+}
+
+.key--black {
+  background-color: black;
+  color: white;
+}
+
+.key--pressed {
+  background-color: red;
+}

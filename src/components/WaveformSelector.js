@@ -7,6 +7,7 @@ function WaveformSelector({
 
   return (
     <select
+      value={value}
       onChange={(e) => {
         onChange(e.target.options[e.target.selectedIndex].value);
       }}

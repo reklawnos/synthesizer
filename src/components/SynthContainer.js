@@ -1,7 +1,10 @@
 import React from 'react';
+import * as qs from 'qs';
+import { debounce } from 'lodash';
 
 import LabeledKnob from './LabeledKnob';
 import WaveformSelector from './WaveformSelector';
+import Keyboard from './Keyboard';
 
 import {
   createNoiseSource,
@@ -54,23 +57,40 @@ const defaultConfig = {
   envRelease: 0.0004,
 };
 
+function convertToNumericConfig(config) {
+  const res = Object.entries(config).reduce((acc, [key, value]) => {
+    return {
+      ...acc,
+      [key]: isNaN(value) ? value : Number(value),
+    };
+  }, {});
+  console.log(res);
+  return res;
+}
+
 class SynthContainer extends React.Component {
   constructor(props) {
     super(props);
 
-    const config = defaultConfig;
+    const queryString = window.location.search.slice(1);
+    const config = {
+      ...defaultConfig,
+      ...convertToNumericConfig(qs.parse(queryString)),
+    };
+
+    console.log(config);
 
     const audioCtx = new AudioContext();
 
     // Sound sources ------------------------
     const vco1 = audioCtx.createOscillator();
-    vco1.type = 'sine';
+    vco1.type = config.vco1Waveform;
     vco1.frequency.value = 440;
     vco1.detune.value = config.vco1Detune
     vco1.start();
 
     const vco2 = audioCtx.createOscillator();
-    vco2.type = 'sine';
+    vco2.type = config.vco2Waveform;
     vco2.frequency.value = 440; // value in hertz
     vco1.detune.value = config.vco2Detune
     vco2.start();
@@ -94,20 +114,20 @@ class SynthContainer extends React.Component {
 
     // Filters ------------------------------
     const fltHighPass = audioCtx.createBiquadFilter();
-    fltHighPass.type = "highpass";
+    fltHighPass.type = 'highpass';
     fltHighPass.frequency.value = config.fltHighPassFreq;
 
     const fltHpRes = audioCtx.createBiquadFilter();
-    fltHpRes.type = "peaking";
+    fltHpRes.type = 'peaking';
     fltHpRes.frequency.value = config.fltHighPassFreq;
     fltHpRes.gain.value = config.fltHighPassRes;
 
     const fltLowPass = audioCtx.createBiquadFilter();
-    fltLowPass.type = "lowpass";
+    fltLowPass.type = 'lowpass';
     fltLowPass.frequency.value = config.fltLowPassFreq;
 
     const fltLpRes = audioCtx.createBiquadFilter();
-    fltLpRes.type = "peaking";
+    fltLpRes.type = 'peaking';
     fltLpRes.frequency.value = config.fltLowPassFreq;
     fltLpRes.gain.value = config.fltLowPassRes;
 
@@ -151,6 +171,9 @@ class SynthContainer extends React.Component {
     const fltLpLfoMod = audioCtx.createGain();
     fltLpLfoMod.gain.value = config.fltLpLfoMod;
 
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+
 
     // Basic wiring
     vco1.connect(vco1Amp);
@@ -168,6 +191,7 @@ class SynthContainer extends React.Component {
     fltLowPass.connect(fltLpRes);
 
     fltLpRes.connect(volume);
+    fltLpRes.connect(analyser);
     volume.connect(audioCtx.destination);
 
 
@@ -237,6 +261,8 @@ class SynthContainer extends React.Component {
     this.vco1 = vco1;
     this.vco2 = vco2;
 
+    this.analyser = analyser;
+
     this.state = {
       ...config,
     };
@@ -244,6 +270,11 @@ class SynthContainer extends React.Component {
     // this.updateSynth();
 
     this.onConfigChange = this.onConfigChange.bind(this);
+    this.pushHistoryUpdateDebounced = debounce(
+      this.pushHistoryUpdate.bind(this),
+      1000,
+      { trailing: true },
+    );
   }
 
   componentDidMount() {
@@ -258,10 +289,88 @@ class SynthContainer extends React.Component {
       this.keysHeld.splice(this.keysHeld.indexOf(e.key), 1);
       this.onKeysChanged();
     });
+
+    window.addEventListener('popstate', (e) => {
+      const queryString = window.location.search.slice(1);
+      const config = {
+        ...defaultConfig,
+        ...convertToNumericConfig(qs.parse(queryString)),
+      };
+
+      this.updateConfig(config);
+      this.setState(config);
+    });
+
+
+    const analyser = this.analyser;
+    const bufferLength = analyser.fftSize;
+    const dataArray = new Float32Array(bufferLength);
+
+    const WIDTH = 300;
+    const HEIGHT = 150;
+
+    const canvasCtx = this.canvasRef.getContext('2d');
+
+    const onAnimationFrame = () => {
+      // Code here adapted from:
+      // https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Visualizations_with_Web_Audio_API
+      const oscPeriod = 1 / (Math.min(this.vco1Freq, this.vco2Freq) || 440);
+      const timeInSamples = Math.round(4 * oscPeriod * this.audioCtx.sampleRate);
+      analyser.getFloatTimeDomainData(dataArray);
+
+      let firstCross;
+      for (let i = 0; i < dataArray.length -1; i += 1) {
+        if (dataArray[i] > 0 && dataArray[i + 1] <= 0) {
+          firstCross = i;
+          break;
+        }
+      }
+
+      canvasCtx.fillStyle = 'rgb(200, 200, 200)';
+      canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      canvasCtx.lineWidth = 2;
+      canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
+
+      canvasCtx.beginPath();
+
+      let sliceWidth = WIDTH * 1.0 / (Math.min(timeInSamples / 2, bufferLength));
+      let x = 0;
+
+      for(let i = firstCross; i < Math.min(timeInSamples, bufferLength); i++) {
+
+        let v = dataArray[i];
+        let y = v * 0.5 * HEIGHT/2 + HEIGHT / 2;
+
+        if(i === 0) {
+          canvasCtx.moveTo(x, y);
+        } else {
+          canvasCtx.lineTo(x, y);
+        }
+
+        x += sliceWidth;
+      }
+
+      canvasCtx.lineTo(this.canvasRef.width, this.canvasRef.height/2);
+      canvasCtx.stroke();
+
+      requestAnimationFrame(onAnimationFrame);
+    };
+
+    requestAnimationFrame(onAnimationFrame);
   }
 
-  componentDidUpdate() {
-    // this.updateSynth();
+  pushHistoryUpdate(state) {
+    const stateDiff = Object.entries(state).reduce((acc, [key, value]) => {
+      if (defaultConfig[key] !== value) {
+        return {
+          ...acc,
+          [key]: value,
+        };
+      }
+      return acc;
+    }, {});
+    window.history.pushState({}, '', `?${qs.stringify(stateDiff)}`);
   }
 
   onKeysChanged() {
@@ -314,23 +423,36 @@ class SynthContainer extends React.Component {
     const vco1Frequency = degreeToFrequency(degree + vco1Octave * 12)
     const vco2Frequency = degreeToFrequency(degree + vco2Octave * 12)
 
+    this.vco1Freq = vco1Frequency;
+    this.vco2Freq = vco1Frequency;
+
     this.vco1.frequency.setValueAtTime(vco1Frequency, 0);
     this.vco2.frequency.setValueAtTime(vco2Frequency, 0);
   }
 
-  onConfigChange(key, value) {
-    const updater = this.configToUpdater[key];
-    if (updater) {
-      updater(value);
-    }
-    this.setState({ [key]: value });
+  updateConfig(config) {
+    Object.entries(config).forEach(([key, value]) => {
+      const updater = this.configToUpdater[key];
+      if (updater) {
+        updater(value);
+      }
+    });
   }
 
+  onConfigChange(key, value) {
+    this.updateConfig({ [key]: value });
+    this.setState({ [key]: value }, () => {
+      this.pushHistoryUpdateDebounced(this.state);
+    });
+  }
 
   render() {
     const config = this.state;
     return (
       <div>
+        <div>
+          <Keyboard />
+        </div>
         <div className="inline-container">
           <div className="section-container">
             <h3>VCO 1</h3>
@@ -364,9 +486,9 @@ class SynthContainer extends React.Component {
               <LabeledKnob
                 label="Octave"
                 valueKey="vco1Octave"
-                min="-4"
-                max="4"
-                step="1"
+                min={-4}
+                max={2}
+                step={1}
                 onChange={this.onConfigChange}
                 config={config}
               />
@@ -404,9 +526,9 @@ class SynthContainer extends React.Component {
               <LabeledKnob
                 label="Octave"
                 valueKey="vco2Octave"
-                min="-4"
-                max="4"
-                step="1"
+                min={-4}
+                max={2}
+                step={1}
                 onChange={this.onConfigChange}
                 config={config}
               />
@@ -559,7 +681,7 @@ class SynthContainer extends React.Component {
             <div className="inline-container">
               <LabeledKnob
                 label="Attack"
-                min={0}
+                min={0.004}
                 max={10}
                 valueKey="envAttack"
                 onChange={this.onConfigChange}
@@ -587,13 +709,17 @@ class SynthContainer extends React.Component {
             <div className="inline-container">
               <LabeledKnob
                 label="Release"
-                min={0}
+                min={0.004}
                 max={10}
                 valueKey="envRelease"
                 onChange={this.onConfigChange}
                 config={config}
               />
             </div>
+          </div>
+          <div className="section-container">
+            <h3>Oscilloscope</h3>
+            <canvas ref={(ref) => { this.canvasRef = ref; }} style={{ width: 300, height: 150 }} />
           </div>
         </div>
       </div>
