@@ -9,6 +9,7 @@ const SLIDER_WIDTH_PX = 250;
 const defaultProps = {
   min: 0,
   max: 1,
+  step: 'any',
 };
 
 class Knob extends React.Component {
@@ -33,6 +34,7 @@ class Knob extends React.Component {
       min,
       max,
       value,
+      step,
       onChange,
     } = this.props;
 
@@ -64,9 +66,9 @@ class Knob extends React.Component {
           type="range"
           min={min}
           max={max}
-          step="any"
+          step={step}
           value={value}
-          onChange={(e) => { onChange(e.target.value); }}
+          onChange={(e) => { onChange(Number(e.target.value)); }}
           onMouseDown={() => {
             this.setState({
               hideOverflow: false,

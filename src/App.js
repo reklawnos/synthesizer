@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import Knob from './components/Knob';
+import LabeledKnob from './components/LabeledKnob';
+import SynthContainer from './components/SynthContainer';
 
 class App extends Component {
   constructor(props) {
@@ -15,15 +16,8 @@ class App extends Component {
   render() {
     const { value } = this.state;
     return (
-      <div style={{ padding: 300 }}>
-        <Knob
-          value={value}
-          onChange={(value) => {
-            this.setState({
-              value,
-            });
-          }}
-        />
+      <div style={{ padding: 30 }}>
+        <SynthContainer />
       </div>
     );
   }

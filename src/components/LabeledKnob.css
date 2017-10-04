@@ -1,0 +1,9 @@
+.labeled-knob__label {
+  text-align: center;
+  padding: 5px;
+}
+
+.labeled-knob__value {
+  text-align: center;
+  padding: 5px;
+}
