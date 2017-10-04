@@ -265,7 +265,7 @@ class SynthContainer extends React.Component {
   }
 
   onKeysChanged() {
-    if (this.keysHeld.length == 0) {
+    if (this.keysHeld.length === 0) {
       if (this.keyIsHeld) {
         this.onReleaseTrigger();
         this.keyIsHeld = false;
@@ -365,7 +365,7 @@ class SynthContainer extends React.Component {
                 label="Octave"
                 valueKey="vco1Octave"
                 min="-4"
-                max="2"
+                max="4"
                 step="1"
                 onChange={this.onConfigChange}
                 config={config}
@@ -405,7 +405,7 @@ class SynthContainer extends React.Component {
                 label="Octave"
                 valueKey="vco2Octave"
                 min="-4"
-                max="2"
+                max="4"
                 step="1"
                 onChange={this.onConfigChange}
                 config={config}
