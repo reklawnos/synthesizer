@@ -215,6 +215,8 @@ class SynthContainer extends React.Component {
     lfo.connect(fltHpLfoMod);
     lfo.connect(fltLpLfoMod);
 
+    vcoFreqEnvMod.connect(vco1.detune);
+    vcoFreqEnvMod.connect(vco2.detune);
     vcoFreqLfoMod.connect(vco1.detune);
     vcoFreqLfoMod.connect(vco2.detune);
 
@@ -550,6 +552,7 @@ class SynthContainer extends React.Component {
             <div className="inline-container">
               <LabeledKnob
                 label="Envelope"
+                max={1200}
                 valueKey="vcoFreqEnvMod"
                 onChange={this.onConfigChange}
                 config={config}
@@ -682,7 +685,7 @@ class SynthContainer extends React.Component {
               <LabeledKnob
                 label="Attack"
                 min={0.004}
-                max={10}
+                max={5}
                 valueKey="envAttack"
                 onChange={this.onConfigChange}
                 config={config}
@@ -692,7 +695,7 @@ class SynthContainer extends React.Component {
               <LabeledKnob
                 label="Decay"
                 min={0}
-                max={10}
+                max={5}
                 valueKey="envDecay"
                 onChange={this.onConfigChange}
                 config={config}
@@ -710,7 +713,7 @@ class SynthContainer extends React.Component {
               <LabeledKnob
                 label="Release"
                 min={0.004}
-                max={10}
+                max={5}
                 valueKey="envRelease"
                 onChange={this.onConfigChange}
                 config={config}
