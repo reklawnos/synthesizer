@@ -5,6 +5,7 @@ import { debounce } from 'lodash';
 import LabeledKnob from './LabeledKnob';
 import WaveformSelector from './WaveformSelector';
 import Keyboard from './Keyboard';
+import Sequencer from './Sequencer';
 
 import {
   createNoiseSource,
@@ -52,7 +53,7 @@ const defaultConfig = {
   fltLpLfoMod: 0,
 
   envAttack: 0.0004,
-  envDecay: 0,
+  envDecay: 0.0004,
   envSustain: 0.5,
   envRelease: 0.0004,
 };
@@ -64,7 +65,6 @@ function convertToNumericConfig(config) {
       [key]: isNaN(value) ? value : Number(value),
     };
   }, {});
-  console.log(res);
   return res;
 }
 
@@ -77,8 +77,6 @@ class SynthContainer extends React.Component {
       ...defaultConfig,
       ...convertToNumericConfig(qs.parse(queryString)),
     };
-
-    console.log(config);
 
     const audioCtx = new AudioContext();
 
@@ -143,7 +141,8 @@ class SynthContainer extends React.Component {
     envelopeSource.start();
 
     const envelopeGain = audioCtx.createGain();
-    envelopeGain.gain.value = 0;
+    envelopeGain.gain.setValueAtTime(0, 0);
+    envelopeGain.gain.linearRampToValueAtTime(0, 100);
     envelopeSource.connect(envelopeGain);
 
     const lfo = audioCtx.createOscillator();
@@ -269,9 +268,8 @@ class SynthContainer extends React.Component {
       ...config,
     };
 
-    // this.updateSynth();
-
     this.onConfigChange = this.onConfigChange.bind(this);
+    this.onPatternChange = this.onPatternChange.bind(this);
     this.pushHistoryUpdateDebounced = debounce(
       this.pushHistoryUpdate.bind(this),
       1000,
@@ -360,6 +358,130 @@ class SynthContainer extends React.Component {
     };
 
     requestAnimationFrame(onAnimationFrame);
+
+    this.pattern = {
+      activeSettings: {},
+      degreeSettings: {},
+    };
+
+    const tempo = 100;
+    const NOTE_SCHEDULING_INTERVAL_MS = 100;
+    const NOTE_SCHEDULING_RANGE_MS = 150;
+
+    this.lastScheduledTime = -1;
+
+    const scheduleNotes = () => {
+      const startTime = this.audioCtx.currentTime;
+      const endTime = startTime + NOTE_SCHEDULING_RANGE_MS / 1000;
+
+      const secondsPerBeat = (60 / (tempo * 4));
+
+      let nextAttackIndex = Math.ceil(this.audioCtx.currentTime / secondsPerBeat);
+      let nextReleaseIndex = Math.floor(this.audioCtx.currentTime / secondsPerBeat);
+
+
+      const attacks = [];
+      const releases = [];
+
+      while (nextAttackIndex * secondsPerBeat < endTime) {
+        if (this.pattern.activeSettings[nextAttackIndex % 16]) {
+        // if ([0, 1, 2, 3, 12, 13, 14, 15].includes(nextAttackIndex % 16)) {
+          attacks.push([nextAttackIndex, this.pattern.degreeSettings[nextAttackIndex % 16]]);
+        }
+        nextAttackIndex += 1;
+      }
+
+      while ((nextReleaseIndex + 0.9) * secondsPerBeat < endTime) {
+        // if ([0, 1, 2, 3, 12, 13, 14, 15].includes(nextAttackIndex % 16)) {
+          releases.push(nextReleaseIndex + 0.9);
+          // }
+        nextReleaseIndex += 1;
+      }
+
+      attacks.forEach(([attackIndex, degree]) => {
+        this.scheduleAttack({ startTime, endTime, nextAttackTime: attackIndex * secondsPerBeat, timeToRelease: secondsPerBeat * 0.9, degree });
+      });
+
+
+      releases.forEach((releaseIndex) => {
+        // this.scheduleRelease({ startTime, endTime, nextReleaseTime: releaseIndex * secondsPerBeat });
+      });
+
+      this.lastScheduledTime = endTime;
+
+      setTimeout(scheduleNotes, NOTE_SCHEDULING_INTERVAL_MS);
+    };
+
+    setTimeout(scheduleNotes, NOTE_SCHEDULING_INTERVAL_MS);
+  }
+
+  scheduleAttack({
+    startTime,
+    endTime,
+    nextAttackTime,
+    timeToRelease,
+    degree,
+  }) {
+    const { envAttack, envDecay, envSustain, envRelease } = this.state;
+    // console.log(nextAttackTime, startTime, endTime, this.lastScheduledTime);
+    // console.log(nextAttackTime > startTime, nextAttackTime < endTime, nextAttackTime > this.lastScheduledTime);
+    if (
+      nextAttackTime > startTime &&
+      nextAttackTime < endTime &&
+      nextAttackTime > this.lastScheduledTime
+    ) {
+      if (this.keysHeld.length < 1) {
+        const { vco1Octave, vco2Octave } = this.state;
+        const vco1Frequency = degreeToFrequency(degree + vco1Octave * 12);
+        const vco2Frequency = degreeToFrequency(degree + vco2Octave * 12);
+
+        this.vco1.frequency.setValueAtTime(vco1Frequency, nextAttackTime);
+        this.vco2.frequency.setValueAtTime(vco2Frequency, nextAttackTime);
+      }
+      /*
+      if (envAttack === 0) {
+        this.envelopeGain.gain.setValueAtTime(1, nextAttackTime);
+      } else {
+        this.envelopeGain.gain.setTargetAtTime(1, nextAttackTime, envAttack);
+      }
+      this.envelopeGain.gain.setTargetAtTime(envSustain, nextAttackTime + envAttack * 3, envDecay);
+
+      console.log(
+        'attack cancels at', nextAttackTime,
+        'then ramps to 1 at', nextAttackTime + envAttack,
+        'then decays to', envSustain, 'at', nextAttackTime + envAttack + envDecay,
+        'holds until', nextAttackTime + timeToRelease,
+        'and releases until', nextAttackTime + timeToRelease + envRelease,
+      );
+      */
+
+      this.envelopeGain.gain.cancelAndHoldAtTime(nextAttackTime);
+      this.envelopeGain.gain.linearRampToValueAtTime(1, nextAttackTime + envAttack);
+      this.envelopeGain.gain.linearRampToValueAtTime(envSustain, nextAttackTime + envAttack + envDecay);
+      this.envelopeGain.gain.linearRampToValueAtTime(envSustain, nextAttackTime + 100);
+
+      // Also do release
+
+      this.envelopeGain.gain.cancelAndHoldAtTime(nextAttackTime + timeToRelease);
+      this.envelopeGain.gain.linearRampToValueAtTime(0, nextAttackTime + timeToRelease + envRelease);
+      this.envelopeGain.gain.linearRampToValueAtTime(0, nextAttackTime + 100)
+    }
+  }
+
+  scheduleRelease({
+    startTime,
+    endTime,
+    nextReleaseTime,
+  }) {
+    const { envAttack, envDecay, envSustain, envRelease } = this.state;
+    if (
+      nextReleaseTime > startTime &&
+      nextReleaseTime < endTime &&
+      nextReleaseTime > this.lastScheduledTime
+    ) {
+      this.envelopeGain.gain.cancelAndHoldAtTime(nextReleaseTime);
+      this.envelopeGain.gain.linearRampToValueAtTime(0, nextReleaseTime + envRelease);
+    }
   }
 
   pushHistoryUpdate(state) {
@@ -413,6 +535,10 @@ class SynthContainer extends React.Component {
     this.envelopeGain.gain.linearRampToValueAtTime(0, currentTime + envRelease);
   }
 
+  onPatternChange(pattern) {
+    this.pattern = pattern;
+  }
+
   setVcoFreq() {
     const { vco1Octave, vco2Octave } = this.state;
 
@@ -454,6 +580,9 @@ class SynthContainer extends React.Component {
       <div>
         <div>
           <Keyboard />
+        </div>
+        <div>
+          <Sequencer onPatternChange={this.onPatternChange} />
         </div>
         <div className="inline-container">
           <div className="section-container">
@@ -694,7 +823,7 @@ class SynthContainer extends React.Component {
             <div className="inline-container">
               <LabeledKnob
                 label="Decay"
-                min={0}
+                min={0.004}
                 max={5}
                 valueKey="envDecay"
                 onChange={this.onConfigChange}
