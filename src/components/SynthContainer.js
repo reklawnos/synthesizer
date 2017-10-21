@@ -6,10 +6,7 @@ import LabeledKnob from './LabeledKnob';
 import WaveformSelector from './WaveformSelector';
 import Keyboard from './Keyboard';
 import Sequencer from './Sequencer';
-
-import {
-  createNoiseSource,
-} from '../utils/AudioUtils';
+import Oscilloscope from './Oscilloscope';
 
 import {
   keyToDegree,
@@ -17,46 +14,7 @@ import {
   degreeToFrequency,
 } from '../utils/KeyboardUtils';
 
-const defaultConfig = {
-  // Sources
-  vco1Volume: 1,
-  vco1Waveform: 'sine',
-  vco1Detune: 0,
-  vco1Octave: 0,
-
-  vco2Volume: 1,
-  vco2Waveform: 'sine',
-  vco2Detune: 0,
-  vco2Octave: 0,
-
-  noiseVolume: 0,
-
-  // Filters
-  fltHighPassFreq: 0,
-  fltHighPassRes: 0,
-
-  fltLowPassFreq: 10000,
-  fltLowPassRes: 0,
-
-  // Global
-  globalVolume: 0.3,
-
-  // Modulation
-  lfoFreq: 2,
-
-  vcoFreqEnvMod: 0,
-  vcoFreqLfoMod: 0,
-
-  fltHpEnvMod: 0,
-  fltHpLfoMod: 0,
-  fltLpEnvMod: 0,
-  fltLpLfoMod: 0,
-
-  envAttack: 0.0004,
-  envDecay: 0.0004,
-  envSustain: 0.5,
-  envRelease: 0.0004,
-};
+import createSynthesizer, { defaultConfig } from '../Synthesizer';
 
 function convertToNumericConfig(config) {
   const res = Object.entries(config).reduce((acc, [key, value]) => {
@@ -73,199 +31,24 @@ class SynthContainer extends React.Component {
     super(props);
 
     const queryString = window.location.search.slice(1);
-    const config = {
+    const synthConfig = {
       ...defaultConfig,
       ...convertToNumericConfig(qs.parse(queryString)),
     };
 
     const audioCtx = new AudioContext();
 
-    // Sound sources ------------------------
-    const vco1 = audioCtx.createOscillator();
-    vco1.type = config.vco1Waveform;
-    vco1.frequency.value = 440;
-    vco1.detune.value = config.vco1Detune
-    vco1.start();
-
-    const vco2 = audioCtx.createOscillator();
-    vco2.type = config.vco2Waveform;
-    vco2.frequency.value = 440; // value in hertz
-    vco1.detune.value = config.vco2Detune
-    vco2.start();
-
-    const noiseSource = createNoiseSource(audioCtx);
-
-
-    // Source amps --------------------------
-    const vco1Amp = audioCtx.createGain();
-    vco1Amp.gain.value = config.vco1Volume;
-
-    const vco2Amp = audioCtx.createGain();
-    vco2Amp.gain.value = config.vco2Volume;
-
-    const noiseAmp = audioCtx.createGain();
-    noiseAmp.gain.value = config.noiseVolume;
-
-    const vcoOverallAmp = audioCtx.createGain();
-    vcoOverallAmp.gain.value = 0;
-
-
-    // Filters ------------------------------
-    const fltHighPass = audioCtx.createBiquadFilter();
-    fltHighPass.type = 'highpass';
-    fltHighPass.frequency.value = config.fltHighPassFreq;
-
-    const fltHpRes = audioCtx.createBiquadFilter();
-    fltHpRes.type = 'peaking';
-    fltHpRes.frequency.value = config.fltHighPassFreq;
-    fltHpRes.gain.value = config.fltHighPassRes;
-
-    const fltLowPass = audioCtx.createBiquadFilter();
-    fltLowPass.type = 'lowpass';
-    fltLowPass.frequency.value = config.fltLowPassFreq;
-
-    const fltLpRes = audioCtx.createBiquadFilter();
-    fltLpRes.type = 'peaking';
-    fltLpRes.frequency.value = config.fltLowPassFreq;
-    fltLpRes.gain.value = config.fltLowPassRes;
-
-
-    // Global effects -----------------------
-    const volume = audioCtx.createGain();
-    volume.gain.value = config.globalVolume;
-
-
-    // Modulation generators ----------------
-    const envelopeSource = audioCtx.createConstantSource();
-    envelopeSource.offset.value = 1;
-    envelopeSource.start();
-
-    const envelopeGain = audioCtx.createGain();
-    envelopeGain.gain.setValueAtTime(0, 0);
-    envelopeGain.gain.linearRampToValueAtTime(0, 100);
-    envelopeSource.connect(envelopeGain);
-
-    const lfo = audioCtx.createOscillator();
-    lfo.type = 'triangle';
-    lfo.frequency.value = config.lfoFreq;
-    lfo.start();
-
-
-    // Modulation gains ---------------------
-    const vcoFreqEnvMod = audioCtx.createGain();
-    vcoFreqEnvMod.gain.value = config.vcoFreqEnvMod;
-
-    const vcoFreqLfoMod = audioCtx.createGain();
-    vcoFreqLfoMod.gain.value = config.vcoFreqLfoMod;
-
-    const fltHpEnvMod = audioCtx.createGain();
-    fltHpEnvMod.gain.value = config.fltHpEnvMod;
-
-    const fltHpLfoMod = audioCtx.createGain();
-    fltHpLfoMod.gain.value = config.fltHpLfoMod;
-
-    const fltLpEnvMod = audioCtx.createGain();
-    fltLpEnvMod.gain.value = config.fltLpEnvMod;
-
-    const fltLpLfoMod = audioCtx.createGain();
-    fltLpLfoMod.gain.value = config.fltLpLfoMod;
-
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-
-
-    // Basic wiring
-    vco1.connect(vco1Amp);
-    vco2.connect(vco2Amp);
-    noiseSource.connect(noiseAmp);
-
-    vco1Amp.connect(vcoOverallAmp);
-    vco2Amp.connect(vcoOverallAmp);
-    noiseAmp.connect(vcoOverallAmp);
-
-    vcoOverallAmp.connect(fltHighPass);
-    fltHighPass.connect(fltHpRes);
-
-    fltHpRes.connect(fltLowPass);
-    fltLowPass.connect(fltLpRes);
-
-    fltLpRes.connect(volume);
-    fltLpRes.connect(analyser);
-    volume.connect(audioCtx.destination);
-
-
-    // Modulation connections
-    envelopeGain.connect(vcoOverallAmp.gain);
-    envelopeGain.connect(vcoFreqEnvMod);
-    envelopeGain.connect(fltHpEnvMod);
-    envelopeGain.connect(fltLpEnvMod);
-
-    fltHpEnvMod.connect(fltLowPass.detune);
-    fltHpEnvMod.connect(fltLpRes.detune);
-    fltHpLfoMod.connect(fltLowPass.detune);
-    fltHpLfoMod.connect(fltLpRes.detune);
-
-    fltLpEnvMod.connect(fltLowPass.detune);
-    fltLpEnvMod.connect(fltLpRes.detune);
-    fltLpLfoMod.connect(fltLowPass.detune);
-    fltLpLfoMod.connect(fltLpRes.detune);
-
-    lfo.connect(vcoFreqLfoMod);
-    lfo.connect(fltHpLfoMod);
-    lfo.connect(fltLpLfoMod);
-
-    vcoFreqEnvMod.connect(vco1.detune);
-    vcoFreqEnvMod.connect(vco2.detune);
-    vcoFreqLfoMod.connect(vco1.detune);
-    vcoFreqLfoMod.connect(vco2.detune);
-
-    this.configToUpdater = {
-      vco1Volume(v = 1) { vco1Amp.gain.value = v; },
-      vco1Waveform(v = 'sine') { vco1.type = v; },
-      vco1Detune(v = 0)  { vco1.detune.value = v; },
-      vco1Octave: (v = 0) => { this.setVcoFreq(); },
-
-      vco2Volume(v = 1) { vco2Amp.gain.value = v; },
-      vco2Waveform(v = 'sine') { vco2.type = v; },
-      vco2Detune(v = 0)  { vco2.detune.value = v; },
-      vco2Octave: (v = 0) => { this.setVcoFreq(); },
-
-      noiseVolume(v = 0) { noiseAmp.gain.value = v; },
-
-      // Filters
-      fltHighPassFreq(v = 0) { fltHighPass.frequency.value = v; },
-      fltHighPassRes(v = 0) { fltHpRes.gain.value = v; },
-
-      fltLowPassFreq(v = 0) { fltLowPass.frequency.value = v; },
-      fltLowPassRes(v = 0) { fltLpRes.gain.value = v; },
-
-      // Global
-      globalVolume(v = 0.3) { volume.gain.value = v; },
-
-      // Modulation
-      lfoFreq(v = 2) { lfo.frequency.value = v; },
-
-      vcoFreqEnvMod(v = 0) { vcoFreqEnvMod.gain.value = v; },
-      vcoFreqLfoMod(v = 0) { vcoFreqLfoMod.gain.value = v; },
-
-      fltHpEnvMod(v = 0) { fltHpEnvMod.gain.value = v; },
-      fltHpLfoMod(v = 0) { fltHpLfoMod.gain.value = v; },
-      fltLpEnvMod(v = 0) { fltLpEnvMod.gain.value = v; },
-      fltLpLfoMod(v = 0) { fltLpLfoMod.gain.value = v; },
-    };
+    this.synthesizer = createSynthesizer(synthConfig, audioCtx);
 
     this.keysHeld = [];
     this.keyIsHeld = false;
 
     this.audioCtx = audioCtx;
-    this.envelopeGain = envelopeGain;
-    this.vco1 = vco1;
-    this.vco2 = vco2;
-
-    this.analyser = analyser;
 
     this.state = {
-      ...config,
+      synthConfig,
+      vco1Freq: 440,
+      vco2Freq: 440,
     };
 
     this.onConfigChange = this.onConfigChange.bind(this);
@@ -292,72 +75,14 @@ class SynthContainer extends React.Component {
 
     window.addEventListener('popstate', (e) => {
       const queryString = window.location.search.slice(1);
-      const config = {
+      const synthConfig = {
         ...defaultConfig,
         ...convertToNumericConfig(qs.parse(queryString)),
       };
 
-      this.updateConfig(config);
-      this.setState(config);
+      this.synthesizer.updateConfig(synthConfig);
+      this.setState({ synthConfig });
     });
-
-
-    const analyser = this.analyser;
-    const bufferLength = analyser.fftSize;
-    const dataArray = new Float32Array(bufferLength);
-
-    const WIDTH = 300;
-    const HEIGHT = 150;
-
-    const canvasCtx = this.canvasRef.getContext('2d');
-
-    const onAnimationFrame = () => {
-      // Code here adapted from:
-      // https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Visualizations_with_Web_Audio_API
-      const oscPeriod = 1 / (Math.min(this.vco1Freq, this.vco2Freq) || 440);
-      const timeInSamples = Math.round(4 * oscPeriod * this.audioCtx.sampleRate);
-      analyser.getFloatTimeDomainData(dataArray);
-
-      let firstCross;
-      for (let i = 0; i < dataArray.length -1; i += 1) {
-        if (dataArray[i] > 0 && dataArray[i + 1] <= 0) {
-          firstCross = i;
-          break;
-        }
-      }
-
-      canvasCtx.fillStyle = 'rgb(200, 200, 200)';
-      canvasCtx.fillRect(0, 0, WIDTH, HEIGHT);
-
-      canvasCtx.lineWidth = 2;
-      canvasCtx.strokeStyle = 'rgb(0, 0, 0)';
-
-      canvasCtx.beginPath();
-
-      let sliceWidth = WIDTH * 1.0 / (Math.min(timeInSamples / 2, bufferLength));
-      let x = 0;
-
-      for(let i = firstCross; i < Math.min(timeInSamples, bufferLength); i++) {
-
-        let v = dataArray[i];
-        let y = v * 0.5 * HEIGHT/2 + HEIGHT / 2;
-
-        if(i === 0) {
-          canvasCtx.moveTo(x, y);
-        } else {
-          canvasCtx.lineTo(x, y);
-        }
-
-        x += sliceWidth;
-      }
-
-      canvasCtx.lineTo(this.canvasRef.width, this.canvasRef.height/2);
-      canvasCtx.stroke();
-
-      requestAnimationFrame(onAnimationFrame);
-    };
-
-    requestAnimationFrame(onAnimationFrame);
 
     this.pattern = {
       activeSettings: {},
@@ -377,34 +102,18 @@ class SynthContainer extends React.Component {
       const secondsPerBeat = (60 / (tempo * 4));
 
       let nextAttackIndex = Math.ceil(this.audioCtx.currentTime / secondsPerBeat);
-      let nextReleaseIndex = Math.floor(this.audioCtx.currentTime / secondsPerBeat);
-
 
       const attacks = [];
-      const releases = [];
 
       while (nextAttackIndex * secondsPerBeat < endTime) {
         if (this.pattern.activeSettings[nextAttackIndex % 16]) {
-        // if ([0, 1, 2, 3, 12, 13, 14, 15].includes(nextAttackIndex % 16)) {
           attacks.push([nextAttackIndex, this.pattern.degreeSettings[nextAttackIndex % 16]]);
         }
         nextAttackIndex += 1;
       }
 
-      while ((nextReleaseIndex + 0.9) * secondsPerBeat < endTime) {
-        // if ([0, 1, 2, 3, 12, 13, 14, 15].includes(nextAttackIndex % 16)) {
-          releases.push(nextReleaseIndex + 0.9);
-          // }
-        nextReleaseIndex += 1;
-      }
-
       attacks.forEach(([attackIndex, degree]) => {
         this.scheduleAttack({ startTime, endTime, nextAttackTime: attackIndex * secondsPerBeat, timeToRelease: secondsPerBeat * 0.9, degree });
-      });
-
-
-      releases.forEach((releaseIndex) => {
-        // this.scheduleRelease({ startTime, endTime, nextReleaseTime: releaseIndex * secondsPerBeat });
       });
 
       this.lastScheduledTime = endTime;
@@ -422,65 +131,23 @@ class SynthContainer extends React.Component {
     timeToRelease,
     degree,
   }) {
-    const { envAttack, envDecay, envSustain, envRelease } = this.state;
-    // console.log(nextAttackTime, startTime, endTime, this.lastScheduledTime);
-    // console.log(nextAttackTime > startTime, nextAttackTime < endTime, nextAttackTime > this.lastScheduledTime);
     if (
       nextAttackTime > startTime &&
       nextAttackTime < endTime &&
       nextAttackTime > this.lastScheduledTime
     ) {
       if (this.keysHeld.length < 1) {
-        const { vco1Octave, vco2Octave } = this.state;
-        const vco1Frequency = degreeToFrequency(degree + vco1Octave * 12);
-        const vco2Frequency = degreeToFrequency(degree + vco2Octave * 12);
+        const frequency = degreeToFrequency(degree);
 
-        this.vco1.frequency.setValueAtTime(vco1Frequency, nextAttackTime);
-        this.vco2.frequency.setValueAtTime(vco2Frequency, nextAttackTime);
+        this.synthesizer.setVcoFrequencyAtTime(frequency, nextAttackTime);
       }
-      /*
-      if (envAttack === 0) {
-        this.envelopeGain.gain.setValueAtTime(1, nextAttackTime);
-      } else {
-        this.envelopeGain.gain.setTargetAtTime(1, nextAttackTime, envAttack);
-      }
-      this.envelopeGain.gain.setTargetAtTime(envSustain, nextAttackTime + envAttack * 3, envDecay);
 
-      console.log(
-        'attack cancels at', nextAttackTime,
-        'then ramps to 1 at', nextAttackTime + envAttack,
-        'then decays to', envSustain, 'at', nextAttackTime + envAttack + envDecay,
-        'holds until', nextAttackTime + timeToRelease,
-        'and releases until', nextAttackTime + timeToRelease + envRelease,
-      );
-      */
+      this.synthesizer.scheduleAttackAtTime(nextAttackTime);
 
-      this.envelopeGain.gain.cancelAndHoldAtTime(nextAttackTime);
-      this.envelopeGain.gain.linearRampToValueAtTime(1, nextAttackTime + envAttack);
-      this.envelopeGain.gain.linearRampToValueAtTime(envSustain, nextAttackTime + envAttack + envDecay);
-      this.envelopeGain.gain.linearRampToValueAtTime(envSustain, nextAttackTime + 100);
-
-      // Also do release
-
-      this.envelopeGain.gain.cancelAndHoldAtTime(nextAttackTime + timeToRelease);
-      this.envelopeGain.gain.linearRampToValueAtTime(0, nextAttackTime + timeToRelease + envRelease);
-      this.envelopeGain.gain.linearRampToValueAtTime(0, nextAttackTime + 100)
-    }
-  }
-
-  scheduleRelease({
-    startTime,
-    endTime,
-    nextReleaseTime,
-  }) {
-    const { envAttack, envDecay, envSustain, envRelease } = this.state;
-    if (
-      nextReleaseTime > startTime &&
-      nextReleaseTime < endTime &&
-      nextReleaseTime > this.lastScheduledTime
-    ) {
-      this.envelopeGain.gain.cancelAndHoldAtTime(nextReleaseTime);
-      this.envelopeGain.gain.linearRampToValueAtTime(0, nextReleaseTime + envRelease);
+      // Also do release, since we already know when it's going to be and there
+      // won't be another attack between this one and the release
+      // TODO: this will need to be changed at some point as this ^^^ shouldn't be guaranteed
+      this.synthesizer.scheduleReleaseAtTime(nextAttackTime + timeToRelease);
     }
   }
 
@@ -503,36 +170,24 @@ class SynthContainer extends React.Component {
         this.onReleaseTrigger();
         this.keyIsHeld = false;
       }
-      // vcoOverallAmp.gain.value = 0;
     } else {
       if (!this.keyIsHeld) {
         this.onAttackTrigger();
         this.keyIsHeld = true;
       }
-      // vcoOverallAmp.gain.value = 1;
       this.setVcoFreq();
     }
   }
 
   onAttackTrigger() {
-    const {
-      envAttack,
-      envDecay,
-      envSustain,
-    } = this.state;
-
     const currentTime = this.audioCtx.currentTime;
-    this.envelopeGain.gain.cancelAndHoldAtTime(0);
-    this.envelopeGain.gain.linearRampToValueAtTime(1, currentTime + envAttack);
-    this.envelopeGain.gain.linearRampToValueAtTime(envSustain, currentTime + envAttack + envDecay);
+    this.synthesizer.scheduleAttackAtTime(currentTime);
   }
 
   onReleaseTrigger() {
-    const { envRelease } = this.state;
-
     const currentTime = this.audioCtx.currentTime;
-    this.envelopeGain.gain.cancelAndHoldAtTime(0);
-    this.envelopeGain.gain.linearRampToValueAtTime(0, currentTime + envRelease);
+
+    this.synthesizer.scheduleReleaseAtTime(currentTime);
   }
 
   onPatternChange(pattern) {
@@ -540,42 +195,34 @@ class SynthContainer extends React.Component {
   }
 
   setVcoFreq() {
-    const { vco1Octave, vco2Octave } = this.state;
-
     if (this.keysHeld.length < 1) {
       return;
     }
 
     const degree = getDegreeForKey(this.keysHeld[this.keysHeld.length - 1]);
 
-    const vco1Frequency = degreeToFrequency(degree + vco1Octave * 12)
-    const vco2Frequency = degreeToFrequency(degree + vco2Octave * 12)
+    const frequency = degreeToFrequency(degree);
 
-    this.vco1Freq = vco1Frequency;
-    this.vco2Freq = vco1Frequency;
+    this.synthesizer.setVcoFrequencyAtTime(frequency, 0);
 
-    this.vco1.frequency.setValueAtTime(vco1Frequency, 0);
-    this.vco2.frequency.setValueAtTime(vco2Frequency, 0);
-  }
-
-  updateConfig(config) {
-    Object.entries(config).forEach(([key, value]) => {
-      const updater = this.configToUpdater[key];
-      if (updater) {
-        updater(value);
-      }
-    });
+    this.setState({ vco1Freq: frequency, vco2Freq: frequency });
   }
 
   onConfigChange(key, value) {
-    this.updateConfig({ [key]: value });
-    this.setState({ [key]: value }, () => {
-      this.pushHistoryUpdateDebounced(this.state);
+    this.synthesizer.updateConfig({ [key]: value });
+    this.setState(({ synthConfig }) => ({
+      synthConfig: {
+        ...synthConfig,
+        [key]: value,
+      },
+    }),
+    () => {
+      this.pushHistoryUpdateDebounced(this.state.synthConfig);
     });
   }
 
   render() {
-    const config = this.state;
+    const { synthConfig: config, vco1Freq } = this.state;
     return (
       <div>
         <div>
@@ -851,7 +498,13 @@ class SynthContainer extends React.Component {
           </div>
           <div className="section-container">
             <h3>Oscilloscope</h3>
-            <canvas ref={(ref) => { this.canvasRef = ref; }} style={{ width: 300, height: 150 }} />
+            <Oscilloscope
+              vco1Octave={config.vco1Octave}
+              vco2Octave={config.vco2Octave}
+              freq={vco1Freq}
+              sampleRate={this.audioCtx.sampleRate}
+              analyser={this.synthesizer.analyser}
+            />
           </div>
         </div>
       </div>
