@@ -5,10 +5,12 @@
   "dependencies": {
     "lodash": "^4.17.4",
     "object.entries": "^1.0.4",
+    "peerjs": "^0.3.14",
     "qs": "^6.5.1",
     "react": "^16.0.0",
     "react-dom": "^16.0.0",
-    "react-scripts": "1.0.14"
+    "react-scripts": "1.0.14",
+    "timesync": "github:reklawnos/timesync#beatsync-changes"
   },
   "scripts": {
     "start": "react-scripts start",

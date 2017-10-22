@@ -1,6 +1,6 @@
 import React from 'react';
 import * as qs from 'qs';
-import { debounce } from 'lodash';
+import { debounce, omit } from 'lodash';
 
 import LabeledKnob from './LabeledKnob';
 import WaveformSelector from './WaveformSelector';
@@ -15,6 +15,18 @@ import {
 } from '../utils/KeyboardUtils';
 
 import createSynthesizer, { defaultConfig } from '../Synthesizer';
+
+import connect from '../webRtcConnection';
+
+function convertToBooleanConfig(config) {
+  const res = Object.entries(config).reduce((acc, [key, value]) => {
+    return {
+      ...acc,
+      [key]: value === 'true',
+    };
+  }, {});
+  return res;
+}
 
 function convertToNumericConfig(config) {
   const res = Object.entries(config).reduce((acc, [key, value]) => {
@@ -31,9 +43,16 @@ class SynthContainer extends React.Component {
     super(props);
 
     const queryString = window.location.search.slice(1);
+    const queryParams = qs.parse(queryString, { arrayLimit: 0 });
+
     const synthConfig = {
       ...defaultConfig,
-      ...convertToNumericConfig(qs.parse(queryString)),
+      ...convertToNumericConfig(omit(queryParams, 'na', 'nd')),
+    };
+
+    const pattern = {
+      activeSettings: convertToBooleanConfig(queryParams.na || {}),
+      degreeSettings: convertToNumericConfig(queryParams.nd || {}),
     };
 
     const audioCtx = new AudioContext();
@@ -49,10 +68,15 @@ class SynthContainer extends React.Component {
       synthConfig,
       vco1Freq: 440,
       vco2Freq: 440,
+      peerId: undefined,
+      connectedPeerId: undefined,
+      pattern,
     };
 
     this.onConfigChange = this.onConfigChange.bind(this);
-    this.onPatternChange = this.onPatternChange.bind(this);
+    this.onNoteDegreeChange = this.onNoteDegreeChange.bind(this);
+    this.onNoteActiveChange = this.onNoteActiveChange.bind(this);
+    this.connectToPeer = this.connectToPeer.bind(this);
     this.pushHistoryUpdateDebounced = debounce(
       this.pushHistoryUpdate.bind(this),
       1000,
@@ -75,19 +99,21 @@ class SynthContainer extends React.Component {
 
     window.addEventListener('popstate', (e) => {
       const queryString = window.location.search.slice(1);
+      const queryParams = qs.parse(queryString, { arrayLimit: 0 });
+
       const synthConfig = {
         ...defaultConfig,
-        ...convertToNumericConfig(qs.parse(queryString)),
+        ...convertToNumericConfig(omit(queryParams, 'na', 'nd')),
+      };
+
+      const pattern = {
+        activeSettings: convertToBooleanConfig(queryParams.na || {}),
+        degreeSettings: convertToNumericConfig(queryParams.nd || {}),
       };
 
       this.synthesizer.updateConfig(synthConfig);
-      this.setState({ synthConfig });
+      this.setState({ synthConfig, pattern });
     });
-
-    this.pattern = {
-      activeSettings: {},
-      degreeSettings: {},
-    };
 
     const tempo = 100;
     const NOTE_SCHEDULING_INTERVAL_MS = 100;
@@ -95,19 +121,35 @@ class SynthContainer extends React.Component {
 
     this.lastScheduledTime = -1;
 
+    const getCurrentTime = () => {
+      if (!this.timesync) {
+        return this.audioCtx.currentTime;
+      }
+
+      return this.timesync.now();
+    };
+
     const scheduleNotes = () => {
-      const startTime = this.audioCtx.currentTime;
+      const currentTime = getCurrentTime();
+      const startTime = currentTime;
       const endTime = startTime + NOTE_SCHEDULING_RANGE_MS / 1000;
 
       const secondsPerBeat = (60 / (tempo * 4));
 
-      let nextAttackIndex = Math.ceil(this.audioCtx.currentTime / secondsPerBeat);
+      let nextAttackIndex = Math.ceil(currentTime / secondsPerBeat);
 
       const attacks = [];
 
+      const {
+        pattern: {
+          activeSettings,
+          degreeSettings,
+        },
+      } = this.state;
+
       while (nextAttackIndex * secondsPerBeat < endTime) {
-        if (this.pattern.activeSettings[nextAttackIndex % 16]) {
-          attacks.push([nextAttackIndex, this.pattern.degreeSettings[nextAttackIndex % 16]]);
+        if (activeSettings[nextAttackIndex % 16]) {
+          attacks.push([nextAttackIndex, degreeSettings[nextAttackIndex % 16] || 0]);
         }
         nextAttackIndex += 1;
       }
@@ -124,6 +166,20 @@ class SynthContainer extends React.Component {
     setTimeout(scheduleNotes, NOTE_SCHEDULING_INTERVAL_MS);
   }
 
+  connectToPeer() {
+    const { connectedPeerId } = this.state;
+    const { peer, ts } = connect(
+      connectedPeerId ? [connectedPeerId] : [],
+      this.audioCtx,
+      (peer) => {
+        this.setState({ peerId: peer.id });
+      },
+    );
+
+    this.peer = peer;
+    this.timesync = ts;
+  }
+
   scheduleAttack({
     startTime,
     endTime,
@@ -136,23 +192,24 @@ class SynthContainer extends React.Component {
       nextAttackTime < endTime &&
       nextAttackTime > this.lastScheduledTime
     ) {
+      const offset = this.timesync ? this.timesync.offset : 0;
       if (this.keysHeld.length < 1) {
         const frequency = degreeToFrequency(degree);
 
-        this.synthesizer.setVcoFrequencyAtTime(frequency, nextAttackTime);
+        this.synthesizer.setVcoFrequencyAtTime(frequency, nextAttackTime - offset);
       }
 
-      this.synthesizer.scheduleAttackAtTime(nextAttackTime);
+      this.synthesizer.scheduleAttackAtTime(nextAttackTime - offset);
 
       // Also do release, since we already know when it's going to be and there
       // won't be another attack between this one and the release
       // TODO: this will need to be changed at some point as this ^^^ shouldn't be guaranteed
-      this.synthesizer.scheduleReleaseAtTime(nextAttackTime + timeToRelease);
+      this.synthesizer.scheduleReleaseAtTime(nextAttackTime + timeToRelease - offset);
     }
   }
 
-  pushHistoryUpdate(state) {
-    const stateDiff = Object.entries(state).reduce((acc, [key, value]) => {
+  pushHistoryUpdate(synthConfig, activeSettings, degreeSettings) {
+    const configDiff = Object.entries(synthConfig).reduce((acc, [key, value]) => {
       if (defaultConfig[key] !== value) {
         return {
           ...acc,
@@ -161,7 +218,33 @@ class SynthContainer extends React.Component {
       }
       return acc;
     }, {});
-    window.history.pushState({}, '', `?${qs.stringify(stateDiff)}`);
+
+    const na = Object.entries(activeSettings).reduce((acc, [key, value]) => {
+      if (value) {
+        return {
+          ...acc,
+          [key]: value,
+        };
+      }
+      return acc;
+    }, {});
+
+    const nd = Object.entries(degreeSettings).reduce((acc, [key, value]) => {
+      if (value !== 0) {
+        return {
+          ...acc,
+          [key]: value,
+        };
+      }
+      return acc;
+    }, {});
+
+    const diff = {
+      ...configDiff,
+      na,
+      nd,
+    };
+    window.history.pushState({}, '', `?${qs.stringify(diff)}`);
   }
 
   onKeysChanged() {
@@ -190,8 +273,48 @@ class SynthContainer extends React.Component {
     this.synthesizer.scheduleReleaseAtTime(currentTime);
   }
 
-  onPatternChange(pattern) {
-    this.pattern = pattern;
+  onNoteDegreeChange(note, degree) {
+    this.setState(({ pattern }) => ({
+      pattern: {
+        ...pattern,
+        degreeSettings: {
+          ...pattern.degreeSettings,
+          [note]: degree,
+        },
+      },
+    }),
+    () => {
+      const {
+        synthConfig,
+        pattern: {
+          activeSettings,
+          degreeSettings,
+        },
+      } = this.state;
+      this.pushHistoryUpdateDebounced(synthConfig, activeSettings, degreeSettings);
+    });
+  }
+
+  onNoteActiveChange(note, active) {
+    this.setState(({ pattern }) => ({
+      pattern: {
+        ...pattern,
+        activeSettings: {
+          ...pattern.activeSettings,
+          [note]: active,
+        },
+      },
+    }),
+    () => {
+      const {
+        synthConfig,
+        pattern: {
+          activeSettings,
+          degreeSettings,
+        },
+      } = this.state;
+      this.pushHistoryUpdateDebounced(synthConfig, activeSettings, degreeSettings);
+    });
   }
 
   setVcoFreq() {
@@ -217,19 +340,36 @@ class SynthContainer extends React.Component {
       },
     }),
     () => {
-      this.pushHistoryUpdateDebounced(this.state.synthConfig);
+      const {
+        synthConfig,
+        pattern: {
+          activeSettings,
+          degreeSettings,
+        },
+      } = this.state;
+      this.pushHistoryUpdateDebounced(synthConfig, activeSettings, degreeSettings);
     });
   }
 
   render() {
-    const { synthConfig: config, vco1Freq } = this.state;
+    const {
+      synthConfig: config,
+      vco1Freq,
+      peerId,
+      connectedPeerId,
+      pattern,
+    } = this.state;
     return (
       <div>
         <div>
           <Keyboard />
         </div>
         <div>
-          <Sequencer onPatternChange={this.onPatternChange} />
+          <Sequencer
+            pattern={pattern}
+            onNoteActiveChange={this.onNoteActiveChange}
+            onNoteDegreeChange={this.onNoteDegreeChange}
+          />
         </div>
         <div className="inline-container">
           <div className="section-container">
@@ -505,6 +645,18 @@ class SynthContainer extends React.Component {
               sampleRate={this.audioCtx.sampleRate}
               analyser={this.synthesizer.analyser}
             />
+          </div>
+        </div>
+        <div className="inline-container">
+          <div className="section-container">
+            <h3>Beat Connection</h3>
+            <input type="text" value={connectedPeerId} onChange={(e) => this.setState({ connectedPeerId: e.target.value })} />
+            <button onClick={this.connectToPeer}>Connect</button>
+            <div>{peerId}</div>
+            <div id="systemTime" />
+            <div id="syncTime" />
+            <div id="offset" />
+            <div id="syncing" />
           </div>
         </div>
       </div>

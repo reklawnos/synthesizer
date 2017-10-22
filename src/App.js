@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import './App.css';
 import SynthContainer from './components/SynthContainer';
 
+
 class App extends Component {
   render() {
     return (

@@ -7,55 +7,42 @@ import './Sequencer.css';
 
 import LabeledKnob from './LabeledKnob';
 
+const noteDegrees = Object.values(keyToDegree);
+const minNoteDegree = Math.min(...noteDegrees);
+const maxNoteDegree = Math.max(...noteDegrees);
+
 class Sequencer extends React.Component {
   constructor(props) {
     super(props);
-
-    this.state = {
-      degreeSettings: range(16).reduce((acc, index) => {
-        return {
-          ...acc,
-          [index]: 0,
-        };
-      }, {}),
-      activeSettings: range(16).reduce((acc, index) => {
-        return {
-          ...acc,
-          [index]: false,
-        };
-      }, {}),
-    };
 
     this.onKnobChanged = this.onKnobChanged.bind(this);
   }
 
   onKnobChanged(key, value) {
-    const { onPatternChange } = this.props;
-    this.setState(({ degreeSettings }) => ({
-      degreeSettings: {
-        ...degreeSettings,
-        [key]: value,
-      },
-    }), () => onPatternChange(this.state));
-
+    const { onNoteDegreeChange } = this.props;
+    onNoteDegreeChange(key, value);
   }
 
   onNoteSelected(degree, selected) {
-    const { onPatternChange } = this.props;
-    this.setState(({ activeSettings }) => ({
-      activeSettings: {
-        ...activeSettings,
-        [degree]: selected,
-      },
-    }), () => onPatternChange(this.state));
+    const { onNoteActiveChange } = this.props;
+    onNoteActiveChange(degree, selected);
   }
 
   render() {
-    const { degreeSettings, activeSettings } = this.state;
+    const {
+      pattern: {
+        degreeSettings,
+        activeSettings,
+      },
+    } = this.props;
 
-    const noteDegrees = Object.values(keyToDegree);
-    const minNoteDegree = Math.min(...noteDegrees);
-    const maxNoteDegree = Math.max(...noteDegrees);
+    const mergedDegreeSettings = {
+      ...range(16).reduce((acc, i) => ({
+        ...acc,
+        [i]: 0,
+      }), {}),
+      ...degreeSettings,
+    };
 
     return (
       <div className="sequencer__container">
@@ -68,12 +55,12 @@ class Sequencer extends React.Component {
               max={maxNoteDegree}
               step={1}
               onChange={this.onKnobChanged}
-              config={degreeSettings}
+              config={mergedDegreeSettings}
             />
             <div>
               <input
                 type="checkbox"
-                value={activeSettings[i]}
+                checked={activeSettings[i]}
                 onChange={(e) => this.onNoteSelected(i, e.target.checked)}
               />
             </div>

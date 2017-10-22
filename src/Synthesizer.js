@@ -193,8 +193,6 @@ export default function createSynthesizer(config, audioCtx) {
   vco1OctaveDetune.connect(vco1.detune);
   vco2OctaveDetune.connect(vco2.detune);
 
-  console.log(vco1OctaveDetune.offset.value);
-
   const configToUpdater = {
     vco1Volume(v = 1) { vco1Amp.gain.value = v; },
     vco1Waveform(v = 'sine') { vco1.type = v; },
@@ -232,7 +230,6 @@ export default function createSynthesizer(config, audioCtx) {
 
   function scheduleAttackAtTime(time) {
     const { envAttack, envDecay, envSustain } = config;
-    console.log('scheduled!')
     envelopeGain.gain.cancelAndHoldAtTime(time);
     envelopeGain.gain.linearRampToValueAtTime(1, time + envAttack);
     envelopeGain.gain.linearRampToValueAtTime(envSustain, time + envAttack + envDecay);
