@@ -15,7 +15,28 @@ class Sequencer extends React.Component {
   constructor(props) {
     super(props);
 
+    this.state = {
+      beatIndex: 0,
+    };
+
     this.onKnobChanged = this.onKnobChanged.bind(this);
+  }
+
+  componentDidMount() {
+    const { getCurrentTime, tempo } = this.props;
+    const doFrame = () => {
+      this.setState(({ beatIndex }) => {
+        const secondsPerBeat = (60 / (tempo * 4));
+        const currentBeatIndex = Math.floor(getCurrentTime() / secondsPerBeat) % 16;
+        if (currentBeatIndex === beatIndex) {
+          return null;
+        }
+
+        return { beatIndex: currentBeatIndex };
+      });
+      requestAnimationFrame(doFrame);
+    };
+    requestAnimationFrame(doFrame);
   }
 
   onKnobChanged(key, value) {
@@ -36,6 +57,8 @@ class Sequencer extends React.Component {
       },
     } = this.props;
 
+    const { beatIndex } = this.state;
+
     const mergedDegreeSettings = {
       ...range(16).reduce((acc, i) => ({
         ...acc,
@@ -46,26 +69,29 @@ class Sequencer extends React.Component {
 
     return (
       <div className="sequencer__container">
-        {range(16).map(i => (
-          <div key={i} className="sequencer-note">
-            <LabeledKnob
-              label=""
-              valueKey={i}
-              min={minNoteDegree}
-              max={maxNoteDegree}
-              step={1}
-              onChange={this.onKnobChanged}
-              config={mergedDegreeSettings}
-            />
-            <div>
-              <input
-                type="checkbox"
-                checked={activeSettings[i]}
-                onChange={(e) => this.onNoteSelected(i, e.target.checked)}
+        {range(16).map(i => {
+          const wrapperClasses = 'sequencer-note' + (beatIndex === i ? ' sequencer-note__current' : '');
+          return (
+            <div key={i} className={wrapperClasses}>
+              <LabeledKnob
+                label=""
+                valueKey={i}
+                min={minNoteDegree}
+                max={maxNoteDegree}
+                step={1}
+                onChange={this.onKnobChanged}
+                config={mergedDegreeSettings}
               />
+              <div>
+                <input
+                  type="checkbox"
+                  checked={activeSettings[i]}
+                  onChange={(e) => this.onNoteSelected(i, e.target.checked)}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }

@@ -6,3 +6,7 @@
   display: inline-block;
   border: 1px solid black;
 }
+
+.sequencer-note__current {
+  background-color: rgba(0, 0, 128, 0.125);
+}

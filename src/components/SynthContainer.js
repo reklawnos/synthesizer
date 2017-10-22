@@ -62,6 +62,8 @@ class SynthContainer extends React.Component {
     this.keysHeld = [];
     this.keyIsHeld = false;
 
+    this.tempo = 100;
+
     this.audioCtx = audioCtx;
 
     this.state = {
@@ -77,6 +79,7 @@ class SynthContainer extends React.Component {
     this.onNoteDegreeChange = this.onNoteDegreeChange.bind(this);
     this.onNoteActiveChange = this.onNoteActiveChange.bind(this);
     this.connectToPeer = this.connectToPeer.bind(this);
+    this.getCurrentTime = this.getCurrentTime.bind(this);
     this.pushHistoryUpdateDebounced = debounce(
       this.pushHistoryUpdate.bind(this),
       1000,
@@ -115,26 +118,17 @@ class SynthContainer extends React.Component {
       this.setState({ synthConfig, pattern });
     });
 
-    const tempo = 100;
     const NOTE_SCHEDULING_INTERVAL_MS = 100;
     const NOTE_SCHEDULING_RANGE_MS = 150;
 
-    this.lastScheduledTime = -1;
-
-    const getCurrentTime = () => {
-      if (!this.timesync) {
-        return this.audioCtx.currentTime;
-      }
-
-      return this.timesync.now();
-    };
+    this.lastScheduledTime = -1;;
 
     const scheduleNotes = () => {
-      const currentTime = getCurrentTime();
+      const currentTime = this.getCurrentTime();
       const startTime = currentTime;
       const endTime = startTime + NOTE_SCHEDULING_RANGE_MS / 1000;
 
-      const secondsPerBeat = (60 / (tempo * 4));
+      const secondsPerBeat = (60 / (this.tempo * 4));
 
       let nextAttackIndex = Math.ceil(currentTime / secondsPerBeat);
 
@@ -178,6 +172,14 @@ class SynthContainer extends React.Component {
 
     this.peer = peer;
     this.timesync = ts;
+  }
+
+  getCurrentTime() {
+    if (!this.timesync) {
+      return this.audioCtx.currentTime;
+    }
+
+    return this.timesync.now();
   }
 
   scheduleAttack({
@@ -369,6 +371,8 @@ class SynthContainer extends React.Component {
             pattern={pattern}
             onNoteActiveChange={this.onNoteActiveChange}
             onNoteDegreeChange={this.onNoteDegreeChange}
+            getCurrentTime={this.getCurrentTime}
+            tempo={this.tempo}
           />
         </div>
         <div className="inline-container">
