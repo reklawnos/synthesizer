@@ -19,3 +19,7 @@
 .key--pressed {
   background-color: red;
 }
+
+.key--sequenced {
+  background-color: green;
+}

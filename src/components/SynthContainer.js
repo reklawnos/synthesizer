@@ -7,6 +7,7 @@ import WaveformSelector from './WaveformSelector';
 import Keyboard from './Keyboard';
 import Sequencer from './Sequencer';
 import Oscilloscope from './Oscilloscope';
+import ShowHide from './ShowHide';
 
 import {
   keyToDegree,
@@ -70,6 +71,7 @@ class SynthContainer extends React.Component {
       synthConfig,
       vco1Freq: 440,
       vco2Freq: 440,
+      isLeader: false,
       peerId: undefined,
       connectedPeerId: undefined,
       pattern,
@@ -79,6 +81,7 @@ class SynthContainer extends React.Component {
     this.onNoteDegreeChange = this.onNoteDegreeChange.bind(this);
     this.onNoteActiveChange = this.onNoteActiveChange.bind(this);
     this.connectToPeer = this.connectToPeer.bind(this);
+    this.becomeLeader = this.becomeLeader.bind(this);
     this.getCurrentTime = this.getCurrentTime.bind(this);
     this.pushHistoryUpdateDebounced = debounce(
       this.pushHistoryUpdate.bind(this),
@@ -173,6 +176,16 @@ class SynthContainer extends React.Component {
     this.peer = peer;
     this.timesync = ts;
   }
+
+  becomeLeader() {
+    this.setState(
+      {
+        connectedPeerId: '',
+        isLeader: true,
+      },
+      () => this.connectToPeer(),
+    );
+  };
 
   getCurrentTime() {
     if (!this.timesync) {
@@ -360,20 +373,29 @@ class SynthContainer extends React.Component {
       peerId,
       connectedPeerId,
       pattern,
+      isLeader,
     } = this.state;
     return (
       <div>
         <div>
-          <Keyboard />
+          <ShowHide name="keyboard" defaultOpen>
+            <Keyboard
+              pattern={pattern}
+              getCurrentTime={this.getCurrentTime}
+              tempo={this.tempo}
+            />
+          </ShowHide>
         </div>
         <div>
-          <Sequencer
-            pattern={pattern}
-            onNoteActiveChange={this.onNoteActiveChange}
-            onNoteDegreeChange={this.onNoteDegreeChange}
-            getCurrentTime={this.getCurrentTime}
-            tempo={this.tempo}
-          />
+          <ShowHide name="sequencer">
+            <Sequencer
+              pattern={pattern}
+              onNoteActiveChange={this.onNoteActiveChange}
+              onNoteDegreeChange={this.onNoteDegreeChange}
+              getCurrentTime={this.getCurrentTime}
+              tempo={this.tempo}
+            />
+          </ShowHide>
         </div>
         <div className="inline-container">
           <div className="section-container">
@@ -654,9 +676,23 @@ class SynthContainer extends React.Component {
         <div className="inline-container">
           <div className="section-container">
             <h3>Beat Connection</h3>
-            <input type="text" value={connectedPeerId} onChange={(e) => this.setState({ connectedPeerId: e.target.value })} />
-            <button onClick={this.connectToPeer}>Connect</button>
-            <div>{peerId}</div>
+            {!isLeader &&
+              <label>
+                {'Leader ID:\u00A0'}
+                <input type="text" value={connectedPeerId} onChange={(e) => this.setState({ connectedPeerId: e.target.value })} />
+              </label>
+            }
+            {!isLeader &&
+              <button onClick={this.connectToPeer}>Connect to leader</button>
+            }
+            {!isLeader && !peerId &&
+              <div style={{ marginTop: 10 }}>
+                <button onClick={this.becomeLeader}>Become leader</button>
+              </div>
+            }
+            {peerId &&
+              <div>ID: {peerId}</div>
+            }
             <div id="systemTime" />
             <div id="syncTime" />
             <div id="offset" />

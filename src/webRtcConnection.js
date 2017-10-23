@@ -33,7 +33,7 @@ export default function connect(peers, audioCtx, onOpen) {
 
   ts.on('change', function (offset) {
     console.log('changed offset: ' + offset);
-    domOffset.innerHTML = offset.toFixed(1) + ' ms';
+    domOffset.innerHTML = `Offset: ${offset.toFixed(1)}s`;
   });
 
   ts.send = function (id, data) {
@@ -53,8 +53,8 @@ export default function connect(peers, audioCtx, onOpen) {
 
   // show the system time and synced time once a second on screen
   function updateDisplay() {
-    domSystemTime.innerHTML = audioCtx.currentTime.toFixed(2);
-    domSyncTime.innerHTML   = ts.now().toFixed(2);
+    domSystemTime.innerText = `Local time: ${audioCtx.currentTime.toFixed(2)}`;
+    domSyncTime.innerText   = `Synced time: ${ts.now().toFixed(2)}`;
 
     setTimeout(updateDisplay, 100);
   }

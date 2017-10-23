@@ -1,12 +1,29 @@
 .sequencer__container {
-
+  margin-bottom: 20px;
 }
 
 .sequencer-note {
   display: inline-block;
   border: 1px solid black;
+  padding: 4px;
 }
 
-.sequencer-note__current {
+.sequencer-note--current {
   background-color: rgba(0, 0, 128, 0.125);
+}
+
+.sequencer-note__checkbox {
+  display: none;
+}
+
+.sequencer-note__checkbox + label {
+  display: block;
+  height: 30px;
+  border: 1px solid black;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sequencer-note__checkbox:checked + label {
+  background-color: #0A0;
 }

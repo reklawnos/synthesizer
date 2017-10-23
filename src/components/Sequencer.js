@@ -5,7 +5,7 @@ import { keyToDegree } from '../utils/KeyboardUtils';
 
 import './Sequencer.css';
 
-import LabeledKnob from './LabeledKnob';
+import DegreeKnob from './DegreeKnob';
 
 const noteDegrees = Object.values(keyToDegree);
 const minNoteDegree = Math.min(...noteDegrees);
@@ -34,9 +34,16 @@ class Sequencer extends React.Component {
 
         return { beatIndex: currentBeatIndex };
       });
-      requestAnimationFrame(doFrame);
+      this.animationFrame = requestAnimationFrame(doFrame);
     };
-    requestAnimationFrame(doFrame);
+
+    doFrame();
+  }
+
+  componentWillUnmount() {
+    if (this.animationFrame) {
+      cancelAnimationFrame(this.animationFrame);
+    }
   }
 
   onKnobChanged(key, value) {
@@ -70,11 +77,10 @@ class Sequencer extends React.Component {
     return (
       <div className="sequencer__container">
         {range(16).map(i => {
-          const wrapperClasses = 'sequencer-note' + (beatIndex === i ? ' sequencer-note__current' : '');
+          const wrapperClasses = 'sequencer-note' + (beatIndex === i ? ' sequencer-note--current' : '');
           return (
             <div key={i} className={wrapperClasses}>
-              <LabeledKnob
-                label=""
+              <DegreeKnob
                 valueKey={i}
                 min={minNoteDegree}
                 max={maxNoteDegree}
@@ -84,9 +90,14 @@ class Sequencer extends React.Component {
               />
               <div>
                 <input
+                  id={`note-active-${i}`}
+                  className="sequencer-note__checkbox"
                   type="checkbox"
-                  checked={activeSettings[i]}
+                  checked={Boolean(activeSettings[i])}
                   onChange={(e) => this.onNoteSelected(i, e.target.checked)}
+                />
+                <label
+                  htmlFor={`note-active-${i}`}
                 />
               </div>
             </div>
