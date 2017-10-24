@@ -160,7 +160,18 @@ class SynthContainer extends React.Component {
       setTimeout(scheduleNotes, NOTE_SCHEDULING_INTERVAL_MS);
     };
 
-    setTimeout(scheduleNotes, NOTE_SCHEDULING_INTERVAL_MS);
+    scheduleNotes();
+
+    // Fix taken from https://github.com/peers/peerjs/issues/278#issuecomment-107276110
+    const pingPeer = () => {
+      if (this.peer) {
+        this.peer.socket.send({type: 'ping'});
+      }
+
+      setTimeout(pingPeer, 20000);
+    };
+
+    setTimeout(pingPeer, 20000);
   }
 
   connectToPeer() {
