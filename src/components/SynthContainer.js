@@ -493,7 +493,7 @@ class SynthContainer extends React.Component {
             <h3>Noise</h3>
             <div className="inline-container">
               <LabeledKnob
-                label="Noise"
+                label="Volume"
                 valueKey="noiseVolume"
                 onChange={this.onConfigChange}
                 config={config}

@@ -26,8 +26,32 @@ class Knob extends React.Component {
       hideOverflow: true,
       inputTranslationFraction: (value - min) / (max - min),
     };
+
+    this.inputOnChange = this.inputOnChange.bind(this);
   }
 
+  componentDidMount() {
+    this.inputRef.addEventListener('change', this.inputOnChange);
+  }
+
+  componentWillUnmount() {
+    this.inputRef.removeEventListener('change', this.inputOnChange);
+  }
+
+  inputOnChange(e) {
+    const {
+      min,
+      max,
+      value,
+    } = this.props;
+
+    const rotationFraction = (value - min) / (max - min);
+
+    this.setState({
+      hideOverflow: true,
+      inputTranslationFraction: rotationFraction
+    });
+  }
 
   render() {
     const {
@@ -64,23 +88,19 @@ class Knob extends React.Component {
         </div>
         <input
           type="range"
+          className="knob__input"
           min={min}
           max={max}
           step={step}
           value={value}
           onChange={(e) => { onChange(Number(e.target.value)); }}
+          ref={(ref) => { this.inputRef = ref; }}
           onMouseDown={() => {
             this.setState({
               hideOverflow: false,
             });
           }}
-          onMouseUp={() => {
-            this.setState({
-              hideOverflow: true,
-              inputTranslationFraction: rotationFraction
-            });
-          }}
-          className="knob__input"
+          onMouseUp={this.inputOnChange}
           style={{
             transform: `translate(${-inputTranslationFraction * SLIDER_WIDTH_PX}px, 0)`,
           }}
