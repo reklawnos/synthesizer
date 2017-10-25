@@ -410,7 +410,7 @@ class SynthContainer extends React.Component {
         </div>
         <div className="inline-container">
           <div className="section-container">
-            <h3>VCO 1</h3>
+            <h3>Oscillator 1</h3>
             <div className="inline-container">
               <WaveformSelector
                 value={config.vco1Waveform}
@@ -450,7 +450,7 @@ class SynthContainer extends React.Component {
             </div>
           </div>
           <div className="section-container">
-            <h3>VCO 2</h3>
+            <h3>Oscillator 2</h3>
             <div className="inline-container">
               <WaveformSelector
                 value={config.vco2Waveform}
