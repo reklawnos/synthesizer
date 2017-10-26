@@ -47,28 +47,39 @@ const defaultSectionsShown = {
   modulation: true,
 };
 
+function getStateFromQueryString() {
+  const queryString = window.location.search.slice(1);
+  const queryParams = qs.parse(queryString, { arrayLimit: 0 });
+
+  const synthConfig = {
+    ...defaultConfig,
+    ...convertToNumericConfig(omit(queryParams, 'na', 'nd', 'ss')),
+  };
+
+  const pattern = {
+    activeSettings: convertToBooleanConfig(queryParams.na || {}),
+    degreeSettings: convertToNumericConfig(queryParams.nd || {}),
+  };
+
+  const sectionsShown = {
+    ...defaultSectionsShown,
+    ...convertToBooleanConfig(queryParams.ss || {}),
+  };
+
+  return {
+    synthConfig,
+    pattern,
+    sectionsShown,
+  };
+}
+
 
 class SynthContainer extends React.Component {
   constructor(props) {
     super(props);
 
-    const queryString = window.location.search.slice(1);
-    const queryParams = qs.parse(queryString, { arrayLimit: 0 });
-
-    const synthConfig = {
-      ...defaultConfig,
-      ...convertToNumericConfig(omit(queryParams, 'na', 'nd', 'ss')),
-    };
-
-    const pattern = {
-      activeSettings: convertToBooleanConfig(queryParams.na || {}),
-      degreeSettings: convertToNumericConfig(queryParams.nd || {}),
-    };
-
-    const sectionsShown = {
-      ...defaultSectionsShown,
-      ...convertToBooleanConfig(queryParams.ss || {}),
-    };
+    const queryState = getStateFromQueryString();
+    const { synthConfig } = queryState;
 
     const audioCtx = new AudioContext();
 
@@ -82,14 +93,12 @@ class SynthContainer extends React.Component {
     this.audioCtx = audioCtx;
 
     this.state = {
-      synthConfig,
+      ...queryState,
       vco1Freq: 440,
       vco2Freq: 440,
       isLeader: false,
       peerId: undefined,
       connectedPeerId: undefined,
-      sectionsShown,
-      pattern,
     };
 
     this.onConfigChange = this.onConfigChange.bind(this);
@@ -120,21 +129,10 @@ class SynthContainer extends React.Component {
     });
 
     window.addEventListener('popstate', (e) => {
-      const queryString = window.location.search.slice(1);
-      const queryParams = qs.parse(queryString, { arrayLimit: 0 });
+      const queryState = getStateFromQueryString();
 
-      const synthConfig = {
-        ...defaultConfig,
-        ...convertToNumericConfig(omit(queryParams, 'na', 'nd')),
-      };
-
-      const pattern = {
-        activeSettings: convertToBooleanConfig(queryParams.na || {}),
-        degreeSettings: convertToNumericConfig(queryParams.nd || {}),
-      };
-
-      this.synthesizer.updateConfig(synthConfig);
-      this.setState({ synthConfig, pattern });
+      this.synthesizer.updateConfig(queryState.synthConfig);
+      this.setState(queryState);
     });
 
     const NOTE_SCHEDULING_INTERVAL_MS = 100;
