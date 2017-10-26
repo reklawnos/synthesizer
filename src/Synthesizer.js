@@ -85,21 +85,13 @@ export default function createSynthesizer(config, audioCtx) {
   // Filters ------------------------------
   const fltHighPass = audioCtx.createBiquadFilter();
   fltHighPass.type = 'highpass';
+  fltHighPass.Q.value = config.fltHighPassRes;
   fltHighPass.frequency.value = config.fltHighPassFreq;
-
-  const fltHpRes = audioCtx.createBiquadFilter();
-  fltHpRes.type = 'peaking';
-  fltHpRes.frequency.value = config.fltHighPassFreq;
-  fltHpRes.gain.value = config.fltHighPassRes;
 
   const fltLowPass = audioCtx.createBiquadFilter();
   fltLowPass.type = 'lowpass';
+  fltLowPass.Q.value = config.fltLowPassRes;
   fltLowPass.frequency.value = config.fltLowPassFreq;
-
-  const fltLpRes = audioCtx.createBiquadFilter();
-  fltLpRes.type = 'peaking';
-  fltLpRes.frequency.value = config.fltLowPassFreq;
-  fltLpRes.gain.value = config.fltLowPassRes;
 
 
   // Global effects -----------------------
@@ -143,7 +135,7 @@ export default function createSynthesizer(config, audioCtx) {
   fltLpLfoMod.gain.value = config.fltLpLfoMod;
 
   const analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
+  analyser.fftSize = 4096;
 
 
   // Basic wiring
@@ -156,13 +148,11 @@ export default function createSynthesizer(config, audioCtx) {
   noiseAmp.connect(vcoOverallAmp);
 
   vcoOverallAmp.connect(fltHighPass);
-  fltHighPass.connect(fltHpRes);
 
-  fltHpRes.connect(fltLowPass);
-  fltLowPass.connect(fltLpRes);
+  fltHighPass.connect(fltLowPass);
 
-  fltLpRes.connect(volume);
-  fltLpRes.connect(analyser);
+  fltLowPass.connect(volume);
+  fltLowPass.connect(analyser);
   volume.connect(audioCtx.destination);
 
 
@@ -172,15 +162,11 @@ export default function createSynthesizer(config, audioCtx) {
   envelopeGain.connect(fltHpEnvMod);
   envelopeGain.connect(fltLpEnvMod);
 
-  fltHpEnvMod.connect(fltLowPass.detune);
-  fltHpEnvMod.connect(fltLpRes.detune);
-  fltHpLfoMod.connect(fltLowPass.detune);
-  fltHpLfoMod.connect(fltLpRes.detune);
+  fltHpEnvMod.connect(fltHighPass.detune);
+  fltHpLfoMod.connect(fltHighPass.detune);
 
   fltLpEnvMod.connect(fltLowPass.detune);
-  fltLpEnvMod.connect(fltLpRes.detune);
   fltLpLfoMod.connect(fltLowPass.detune);
-  fltLpLfoMod.connect(fltLpRes.detune);
 
   lfo.connect(vcoFreqLfoMod);
   lfo.connect(fltHpLfoMod);
@@ -208,10 +194,10 @@ export default function createSynthesizer(config, audioCtx) {
 
     // Filters
     fltHighPassFreq(v = 0) { fltHighPass.frequency.value = v; },
-    fltHighPassRes(v = 0) { fltHpRes.gain.value = v; },
+    fltHighPassRes(v = 0) { fltHighPass.Q.value = v; },
 
     fltLowPassFreq(v = 0) { fltLowPass.frequency.value = v; },
-    fltLowPassRes(v = 0) { fltLpRes.gain.value = v; },
+    fltLowPassRes(v = 0) { fltLowPass.Q.value = v; },
 
     // Global
     globalVolume(v = 0.3) { volume.gain.value = v; },

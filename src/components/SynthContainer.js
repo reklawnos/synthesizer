@@ -7,7 +7,8 @@ import WaveformSelector from './WaveformSelector';
 import Keyboard from './Keyboard';
 import Sequencer from './Sequencer';
 import Oscilloscope from './Oscilloscope';
-import ShowHide from './ShowHide';
+import SpectrumAnalyser from './SpectrumAnalyser';
+import VisibilitySettings from './VisibilitySettings'
 
 import {
   keyToDegree,
@@ -39,6 +40,14 @@ function convertToNumericConfig(config) {
   return res;
 }
 
+const defaultSectionsShown = {
+  keyboard: true,
+  sequencer: false,
+  filter: true,
+  modulation: true,
+};
+
+
 class SynthContainer extends React.Component {
   constructor(props) {
     super(props);
@@ -48,12 +57,17 @@ class SynthContainer extends React.Component {
 
     const synthConfig = {
       ...defaultConfig,
-      ...convertToNumericConfig(omit(queryParams, 'na', 'nd')),
+      ...convertToNumericConfig(omit(queryParams, 'na', 'nd', 'ss')),
     };
 
     const pattern = {
       activeSettings: convertToBooleanConfig(queryParams.na || {}),
       degreeSettings: convertToNumericConfig(queryParams.nd || {}),
+    };
+
+    const sectionsShown = {
+      ...defaultSectionsShown,
+      ...convertToBooleanConfig(queryParams.ss || {}),
     };
 
     const audioCtx = new AudioContext();
@@ -74,12 +88,14 @@ class SynthContainer extends React.Component {
       isLeader: false,
       peerId: undefined,
       connectedPeerId: undefined,
+      sectionsShown,
       pattern,
     };
 
     this.onConfigChange = this.onConfigChange.bind(this);
     this.onNoteDegreeChange = this.onNoteDegreeChange.bind(this);
     this.onNoteActiveChange = this.onNoteActiveChange.bind(this);
+    this.onVisibilityChange = this.onVisibilityChange.bind(this);
     this.connectToPeer = this.connectToPeer.bind(this);
     this.becomeLeader = this.becomeLeader.bind(this);
     this.getCurrentTime = this.getCurrentTime.bind(this);
@@ -234,7 +250,16 @@ class SynthContainer extends React.Component {
     }
   }
 
-  pushHistoryUpdate(synthConfig, activeSettings, degreeSettings) {
+  pushHistoryUpdate() {
+    const {
+      synthConfig,
+      pattern: {
+        activeSettings,
+        degreeSettings,
+      },
+      sectionsShown,
+    }= this.state;
+
     const configDiff = Object.entries(synthConfig).reduce((acc, [key, value]) => {
       if (defaultConfig[key] !== value) {
         return {
@@ -265,10 +290,21 @@ class SynthContainer extends React.Component {
       return acc;
     }, {});
 
+    const ss = Object.entries(sectionsShown).reduce((acc, [key, value]) => {
+      if (defaultSectionsShown[key] !== value) {
+        return {
+          ...acc,
+          [key]: value,
+        };
+      }
+      return acc;
+    }, {});
+
     const diff = {
       ...configDiff,
       na,
       nd,
+      ss,
     };
     window.history.pushState({}, '', `?${qs.stringify(diff)}`);
   }
@@ -310,14 +346,7 @@ class SynthContainer extends React.Component {
       },
     }),
     () => {
-      const {
-        synthConfig,
-        pattern: {
-          activeSettings,
-          degreeSettings,
-        },
-      } = this.state;
-      this.pushHistoryUpdateDebounced(synthConfig, activeSettings, degreeSettings);
+      this.pushHistoryUpdateDebounced();
     });
   }
 
@@ -332,14 +361,7 @@ class SynthContainer extends React.Component {
       },
     }),
     () => {
-      const {
-        synthConfig,
-        pattern: {
-          activeSettings,
-          degreeSettings,
-        },
-      } = this.state;
-      this.pushHistoryUpdateDebounced(synthConfig, activeSettings, degreeSettings);
+      this.pushHistoryUpdateDebounced();
     });
   }
 
@@ -366,15 +388,12 @@ class SynthContainer extends React.Component {
       },
     }),
     () => {
-      const {
-        synthConfig,
-        pattern: {
-          activeSettings,
-          degreeSettings,
-        },
-      } = this.state;
-      this.pushHistoryUpdateDebounced(synthConfig, activeSettings, degreeSettings);
+      this.pushHistoryUpdateDebounced();
     });
+  }
+
+  onVisibilityChange(sectionsShown) {
+    this.setState({ sectionsShown }, () => this.pushHistoryUpdateDebounced());
   }
 
   render() {
@@ -385,20 +404,25 @@ class SynthContainer extends React.Component {
       connectedPeerId,
       pattern,
       isLeader,
+      sectionsShown,
     } = this.state;
     return (
       <div>
+        <VisibilitySettings
+          sectionsShown={sectionsShown}
+          onChange={this.onVisibilityChange}
+        />
         <div>
-          <ShowHide name="keyboard" defaultOpen>
+          {sectionsShown.keyboard &&
             <Keyboard
               pattern={pattern}
               getCurrentTime={this.getCurrentTime}
               tempo={this.tempo}
             />
-          </ShowHide>
+          }
         </div>
         <div>
-          <ShowHide name="sequencer">
+          {sectionsShown.sequencer &&
             <Sequencer
               pattern={pattern}
               onNoteActiveChange={this.onNoteActiveChange}
@@ -406,12 +430,12 @@ class SynthContainer extends React.Component {
               getCurrentTime={this.getCurrentTime}
               tempo={this.tempo}
             />
-          </ShowHide>
+          }
         </div>
         <div className="inline-container">
           <div className="section-container">
             <h3>Oscillator 1</h3>
-            <div className="inline-container">
+            <div>
               <WaveformSelector
                 value={config.vco1Waveform}
                 onChange={(value) => {
@@ -451,10 +475,11 @@ class SynthContainer extends React.Component {
           </div>
           <div className="section-container">
             <h3>Oscillator 2</h3>
-            <div className="inline-container">
+            <div>
               <WaveformSelector
                 value={config.vco2Waveform}
                 onChange={(value) => {
+                  console.log(value);
                   this.onConfigChange('vco2Waveform', value);
                 }}
               />
@@ -500,179 +525,187 @@ class SynthContainer extends React.Component {
               />
             </div>
           </div>
-          <div className="section-container">
-            <h3>Frequency Modulation</h3>
-            <div className="inline-container">
-              <LabeledKnob
-                label="Envelope"
-                max={1200}
-                valueKey="vcoFreqEnvMod"
-                onChange={this.onConfigChange}
-                config={config}
-              />
+          {sectionsShown.modulation &&
+            <div className="section-container">
+              <h3>Frequency Modulation</h3>
+              <div className="inline-container">
+                <LabeledKnob
+                  label="Envelope"
+                  max={1200}
+                  valueKey="vcoFreqEnvMod"
+                  onChange={this.onConfigChange}
+                  config={config}
+                />
+              </div>
+              <div className="inline-container">
+                <LabeledKnob
+                  label="LFO"
+                  max={600}
+                  valueKey="vcoFreqLfoMod"
+                  onChange={this.onConfigChange}
+                  config={config}
+                />
+              </div>
             </div>
-            <div className="inline-container">
-              <LabeledKnob
-                label="LFO"
-                max={600}
-                valueKey="vcoFreqLfoMod"
-                onChange={this.onConfigChange}
-                config={config}
-              />
+          }
+        </div>
+        {sectionsShown.filter &&
+          <div className="inline-container">
+            <div className="section-container">
+              <h3>High Pass Filter</h3>
+              <div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="Frequency"
+                    min={0}
+                    max={10000}
+                    valueKey="fltHighPassFreq"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="Resonance"
+                    min={0}
+                    max={40}
+                    valueKey="fltHighPassRes"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="Envelope Mod"
+                    min={0}
+                    max={10000}
+                    valueKey="fltHpEnvMod"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="LFO Mod"
+                    min={0}
+                    max={10000}
+                    valueKey="fltHpLfoMod"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="section-container">
+              <h3>Low Pass Filter</h3>
+              <div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="Frequency"
+                    min={0}
+                    max={10000}
+                    valueKey="fltLowPassFreq"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="Resonance"
+                    min={0}
+                    max={40}
+                    valueKey="fltLowPassRes"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="Envelope Mod"
+                    min={0}
+                    max={10000}
+                    valueKey="fltLpEnvMod"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+                <div className="inline-container">
+                  <LabeledKnob
+                    label="LFO Mod"
+                    min={0}
+                    max={10000}
+                    valueKey="fltLpLfoMod"
+                    onChange={this.onConfigChange}
+                    config={config}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        }
         <div className="inline-container">
-          <div className="section-container">
-            <h3>High Pass Filter</h3>
-            <div>
+          {sectionsShown.modulation &&
+            <div className="section-container">
+              <h3>LFO</h3>
               <div className="inline-container">
                 <LabeledKnob
                   label="Frequency"
                   min={0}
-                  max={10000}
-                  valueKey="fltHighPassFreq"
+                  max={20}
+                  valueKey="lfoFreq"
+                  onChange={this.onConfigChange}
+                  config={config}
+                />
+              </div>
+            </div>
+          }
+          {sectionsShown.modulation &&
+            <div className="section-container">
+              <h3>Envelope</h3>
+              <div className="inline-container">
+                <LabeledKnob
+                  label="Attack"
+                  min={0.004}
+                  max={5}
+                  valueKey="envAttack"
                   onChange={this.onConfigChange}
                   config={config}
                 />
               </div>
               <div className="inline-container">
                 <LabeledKnob
-                  label="Resonance"
-                  min={0}
-                  max={40}
-                  valueKey="fltHighPassRes"
-                  onChange={this.onConfigChange}
-                  config={config}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="inline-container">
-                <LabeledKnob
-                  label="Envelope Mod"
-                  min={0}
-                  max={10000}
-                  valueKey="fltHpEnvMod"
+                  label="Decay"
+                  min={0.004}
+                  max={5}
+                  valueKey="envDecay"
                   onChange={this.onConfigChange}
                   config={config}
                 />
               </div>
               <div className="inline-container">
                 <LabeledKnob
-                  label="LFO Mod"
-                  min={0}
-                  max={10000}
-                  valueKey="fltHpLfoMod"
-                  onChange={this.onConfigChange}
-                  config={config}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="section-container">
-            <h3>Low Pass Filter</h3>
-            <div>
-              <div className="inline-container">
-                <LabeledKnob
-                  label="Frequency"
-                  min={0}
-                  max={10000}
-                  valueKey="fltLowPassFreq"
+                  label="Sustain"
+                  valueKey="envSustain"
                   onChange={this.onConfigChange}
                   config={config}
                 />
               </div>
               <div className="inline-container">
                 <LabeledKnob
-                  label="Resonance"
-                  min={0}
-                  max={40}
-                  valueKey="fltLowPassRes"
+                  label="Release"
+                  min={0.004}
+                  max={5}
+                  valueKey="envRelease"
                   onChange={this.onConfigChange}
                   config={config}
                 />
               </div>
             </div>
-            <div>
-              <div className="inline-container">
-                <LabeledKnob
-                  label="Envelope Mod"
-                  min={0}
-                  max={10000}
-                  valueKey="fltLpEnvMod"
-                  onChange={this.onConfigChange}
-                  config={config}
-                />
-              </div>
-              <div className="inline-container">
-                <LabeledKnob
-                  label="LFO Mod"
-                  min={0}
-                  max={10000}
-                  valueKey="fltLpLfoMod"
-                  onChange={this.onConfigChange}
-                  config={config}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="inline-container">
-          <div className="section-container">
-            <h3>LFO</h3>
-            <div className="inline-container">
-              <LabeledKnob
-                label="Frequency"
-                min={0}
-                max={20}
-                valueKey="lfoFreq"
-                onChange={this.onConfigChange}
-                config={config}
-              />
-            </div>
-          </div>
-          <div className="section-container">
-            <h3>Envelope</h3>
-            <div className="inline-container">
-              <LabeledKnob
-                label="Attack"
-                min={0.004}
-                max={5}
-                valueKey="envAttack"
-                onChange={this.onConfigChange}
-                config={config}
-              />
-            </div>
-            <div className="inline-container">
-              <LabeledKnob
-                label="Decay"
-                min={0.004}
-                max={5}
-                valueKey="envDecay"
-                onChange={this.onConfigChange}
-                config={config}
-              />
-            </div>
-            <div className="inline-container">
-              <LabeledKnob
-                label="Sustain"
-                valueKey="envSustain"
-                onChange={this.onConfigChange}
-                config={config}
-              />
-            </div>
-            <div className="inline-container">
-              <LabeledKnob
-                label="Release"
-                min={0.004}
-                max={5}
-                valueKey="envRelease"
-                onChange={this.onConfigChange}
-                config={config}
-              />
-            </div>
-          </div>
+          }
           <div className="section-container">
             <h3>Oscilloscope</h3>
             <Oscilloscope
@@ -680,6 +713,10 @@ class SynthContainer extends React.Component {
               vco2Octave={config.vco2Octave}
               freq={vco1Freq}
               sampleRate={this.audioCtx.sampleRate}
+              analyser={this.synthesizer.analyser}
+            />
+            <h3>Spectrum Analyser</h3>
+            <SpectrumAnalyser
               analyser={this.synthesizer.analyser}
             />
           </div>

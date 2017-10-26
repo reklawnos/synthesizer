@@ -1,22 +1,34 @@
 import React from 'react';
+import Select from 'react-select';
+import 'react-select/dist/react-select.css';
+
+import './WaveformSelector.css';
+import SineWaveIcon from './icon/SineWaveIcon';
+import TriangleWaveIcon from './icon/TriangleWaveIcon';
+import SquareWaveIcon from './icon/SquareWaveIcon';
+import SawtoothWaveIcon from './icon/SawtoothWaveIcon';
+
+const options = [
+  { value: 'sine', label: <span><SineWaveIcon />Sine</span> },
+  { value: 'triangle', label: <span><TriangleWaveIcon />Triangle</span> },
+  { value: 'square', label: <span><SquareWaveIcon />Square</span> },
+  { value: 'sawtooth', label: <span><SawtoothWaveIcon />Sawtooth</span> },
+];
+
 
 function WaveformSelector({
   value,
   onChange,
 }) {
-
   return (
-    <select
+    <Select
+      className="waveform-selector"
+      options={options}
       value={value}
-      onChange={(e) => {
-        onChange(e.target.options[e.target.selectedIndex].value);
-      }}
-    >
-      <option value="sine">Sine</option>
-      <option value="triangle">Triangle</option>
-      <option value="square">Square</option>
-      <option value="sawtooth">Sawtooth</option>
-    </select>
+      onChange={({ value }) => onChange(value)}
+      clearable={false}
+      searchable={false}
+    />
   );
 }
 
