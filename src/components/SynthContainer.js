@@ -575,28 +575,30 @@ class SynthContainer extends React.Component {
                   />
                 </div>
               </div>
-              <div>
-                <div className="inline-container">
-                  <LabeledKnob
-                    label="Envelope Mod"
-                    min={0}
-                    max={10000}
-                    valueKey="fltHpEnvMod"
-                    onChange={this.onConfigChange}
-                    config={config}
-                  />
+              {sectionsShown.modulation &&
+                <div>
+                  <div className="inline-container">
+                    <LabeledKnob
+                      label="Envelope Mod"
+                      min={0}
+                      max={10000}
+                      valueKey="fltHpEnvMod"
+                      onChange={this.onConfigChange}
+                      config={config}
+                    />
+                  </div>
+                  <div className="inline-container">
+                    <LabeledKnob
+                      label="LFO Mod"
+                      min={0}
+                      max={10000}
+                      valueKey="fltHpLfoMod"
+                      onChange={this.onConfigChange}
+                      config={config}
+                    />
+                  </div>
                 </div>
-                <div className="inline-container">
-                  <LabeledKnob
-                    label="LFO Mod"
-                    min={0}
-                    max={10000}
-                    valueKey="fltHpLfoMod"
-                    onChange={this.onConfigChange}
-                    config={config}
-                  />
-                </div>
-              </div>
+              }
             </div>
             <div className="section-container">
               <h3>Low Pass Filter</h3>
@@ -622,28 +624,30 @@ class SynthContainer extends React.Component {
                   />
                 </div>
               </div>
-              <div>
-                <div className="inline-container">
-                  <LabeledKnob
-                    label="Envelope Mod"
-                    min={0}
-                    max={10000}
-                    valueKey="fltLpEnvMod"
-                    onChange={this.onConfigChange}
-                    config={config}
-                  />
+              {sectionsShown.modulation &&
+                <div>
+                  <div className="inline-container">
+                    <LabeledKnob
+                      label="Envelope Mod"
+                      min={0}
+                      max={10000}
+                      valueKey="fltLpEnvMod"
+                      onChange={this.onConfigChange}
+                      config={config}
+                    />
+                  </div>
+                  <div className="inline-container">
+                    <LabeledKnob
+                      label="LFO Mod"
+                      min={0}
+                      max={10000}
+                      valueKey="fltLpLfoMod"
+                      onChange={this.onConfigChange}
+                      config={config}
+                    />
+                  </div>
                 </div>
-                <div className="inline-container">
-                  <LabeledKnob
-                    label="LFO Mod"
-                    min={0}
-                    max={10000}
-                    valueKey="fltLpLfoMod"
-                    onChange={this.onConfigChange}
-                    config={config}
-                  />
-                </div>
-              </div>
+              }
             </div>
           </div>
         }
