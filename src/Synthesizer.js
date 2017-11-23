@@ -1,3 +1,5 @@
+import * as EnvGen from 'fastidious-envelope-generator';
+
 import {
   createNoiseSource,
 } from './utils/AudioUtils';
@@ -106,8 +108,14 @@ export default function createSynthesizer(config, audioCtx) {
 
   const envelopeGain = audioCtx.createGain();
   envelopeGain.gain.setValueAtTime(0, 0);
-  envelopeGain.gain.linearRampToValueAtTime(0, 100);
   envelopeSource.connect(envelopeGain);
+
+  const envelopeGenerator = new EnvGen(audioCtx, envelopeGain.gain);
+  envelopeGenerator.mode = 'ADSR';
+  envelopeGenerator.attackTime = config.envAttack;
+  envelopeGenerator.decayTime = config.envDecay;
+  envelopeGenerator.sustainLevel = config.envSustain;
+  envelopeGenerator.releaseTime = config.envRelease;
 
   const lfo = audioCtx.createOscillator();
   lfo.type = 'triangle';
@@ -212,22 +220,18 @@ export default function createSynthesizer(config, audioCtx) {
     fltHpLfoMod(v = 0) { fltHpLfoMod.gain.value = v; },
     fltLpEnvMod(v = 0) { fltLpEnvMod.gain.value = v; },
     fltLpLfoMod(v = 0) { fltLpLfoMod.gain.value = v; },
+    envAttack(v) { envelopeGenerator.attackTime = config.envAttack; },
+    envDecay(v) { envelopeGenerator.decayTime = config.envDecay; },
+    envSustain(v) { envelopeGenerator.sustainLevel = config.envSustain; },
+    envRelease(v) { envelopeGenerator.releaseTime = config.envRelease; },
   };
 
   function scheduleAttackAtTime(time) {
-    const { envAttack, envDecay, envSustain } = config;
-    envelopeGain.gain.cancelAndHoldAtTime(time);
-    envelopeGain.gain.linearRampToValueAtTime(1, time + envAttack);
-    envelopeGain.gain.linearRampToValueAtTime(envSustain, time + envAttack + envDecay);
-    envelopeGain.gain.linearRampToValueAtTime(envSustain, time + 100);
+    envelopeGenerator.gateOn(time);
   }
 
   function scheduleReleaseAtTime(time) {
-    const { envRelease } = config;
-
-    envelopeGain.gain.cancelAndHoldAtTime(time);
-    envelopeGain.gain.linearRampToValueAtTime(0, time + envRelease);
-    envelopeGain.gain.linearRampToValueAtTime(0, time + 100)
+    envelopeGenerator.gateOff(time);
   }
 
   function setVcoFrequencyAtTime(frequency, time) {

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "fastidious-envelope-generator": "^2.0.0",
     "lodash": "^4.17.4",
     "object.entries": "^1.0.4",
     "peerjs": "^0.3.14",
