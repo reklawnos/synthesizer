@@ -1,6 +1,15 @@
 {
-  "main.css": "static/css/main.e909cf1c.css",
-  "main.css.map": "static/css/main.e909cf1c.css.map",
-  "main.js": "static/js/main.d05e5367.js",
-  "main.js.map": "static/js/main.d05e5367.js.map"
+  "main.css": "/synthesizer/static/css/main.e283786b.chunk.css",
+  "main.js": "/synthesizer/static/js/main.a87fe756.chunk.js",
+  "main.js.map": "/synthesizer/static/js/main.a87fe756.chunk.js.map",
+  "static/css/1.722d0136.chunk.css": "/synthesizer/static/css/1.722d0136.chunk.css",
+  "static/js/1.56b9b505.chunk.js": "/synthesizer/static/js/1.56b9b505.chunk.js",
+  "static/js/1.56b9b505.chunk.js.map": "/synthesizer/static/js/1.56b9b505.chunk.js.map",
+  "runtime~main.js": "/synthesizer/static/js/runtime~main.c536c2aa.js",
+  "runtime~main.js.map": "/synthesizer/static/js/runtime~main.c536c2aa.js.map",
+  "static/css/main.e283786b.chunk.css.map": "/synthesizer/static/css/main.e283786b.chunk.css.map",
+  "static/css/1.722d0136.chunk.css.map": "/synthesizer/static/css/1.722d0136.chunk.css.map",
+  "index.html": "/synthesizer/index.html",
+  "precache-manifest.49e91c3b6a3cf31f083cdf576e83d10e.js": "/synthesizer/precache-manifest.49e91c3b6a3cf31f083cdf576e83d10e.js",
+  "service-worker.js": "/synthesizer/service-worker.js"
 }
