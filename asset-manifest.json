@@ -1,15 +1,25 @@
 {
-  "main.css": "/synthesizer/static/css/main.e283786b.chunk.css",
-  "main.js": "/synthesizer/static/js/main.a87fe756.chunk.js",
-  "main.js.map": "/synthesizer/static/js/main.a87fe756.chunk.js.map",
-  "static/css/1.722d0136.chunk.css": "/synthesizer/static/css/1.722d0136.chunk.css",
-  "static/js/1.56b9b505.chunk.js": "/synthesizer/static/js/1.56b9b505.chunk.js",
-  "static/js/1.56b9b505.chunk.js.map": "/synthesizer/static/js/1.56b9b505.chunk.js.map",
-  "runtime~main.js": "/synthesizer/static/js/runtime~main.c536c2aa.js",
-  "runtime~main.js.map": "/synthesizer/static/js/runtime~main.c536c2aa.js.map",
-  "static/css/main.e283786b.chunk.css.map": "/synthesizer/static/css/main.e283786b.chunk.css.map",
-  "static/css/1.722d0136.chunk.css.map": "/synthesizer/static/css/1.722d0136.chunk.css.map",
-  "index.html": "/synthesizer/index.html",
-  "precache-manifest.49e91c3b6a3cf31f083cdf576e83d10e.js": "/synthesizer/precache-manifest.49e91c3b6a3cf31f083cdf576e83d10e.js",
-  "service-worker.js": "/synthesizer/service-worker.js"
+  "files": {
+    "main.css": "/synthesizer/static/css/main.3c70df6f.chunk.css",
+    "main.js": "/synthesizer/static/js/main.f2cfef4e.chunk.js",
+    "main.js.map": "/synthesizer/static/js/main.f2cfef4e.chunk.js.map",
+    "runtime-main.js": "/synthesizer/static/js/runtime-main.0b7a2c14.js",
+    "runtime-main.js.map": "/synthesizer/static/js/runtime-main.0b7a2c14.js.map",
+    "static/css/2.75b42941.chunk.css": "/synthesizer/static/css/2.75b42941.chunk.css",
+    "static/js/2.b46cf756.chunk.js": "/synthesizer/static/js/2.b46cf756.chunk.js",
+    "static/js/2.b46cf756.chunk.js.map": "/synthesizer/static/js/2.b46cf756.chunk.js.map",
+    "index.html": "/synthesizer/index.html",
+    "precache-manifest.d679c26eb368cabfee64f1a60ff8fb72.js": "/synthesizer/precache-manifest.d679c26eb368cabfee64f1a60ff8fb72.js",
+    "service-worker.js": "/synthesizer/service-worker.js",
+    "static/css/2.75b42941.chunk.css.map": "/synthesizer/static/css/2.75b42941.chunk.css.map",
+    "static/css/main.3c70df6f.chunk.css.map": "/synthesizer/static/css/main.3c70df6f.chunk.css.map",
+    "static/js/2.b46cf756.chunk.js.LICENSE.txt": "/synthesizer/static/js/2.b46cf756.chunk.js.LICENSE.txt"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.0b7a2c14.js",
+    "static/css/2.75b42941.chunk.css",
+    "static/js/2.b46cf756.chunk.js",
+    "static/css/main.3c70df6f.chunk.css",
+    "static/js/main.f2cfef4e.chunk.js"
+  ]
 }
