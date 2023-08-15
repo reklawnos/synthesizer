@@ -8,7 +8,7 @@ import Keyboard from './Keyboard';
 import Sequencer from './Sequencer';
 import Oscilloscope from './Oscilloscope';
 import SpectrumAnalyser from './SpectrumAnalyser';
-import VisibilitySettings from './VisibilitySettings'
+import VisibilitySettings from './VisibilitySettings';
 
 import {
   keyToDegree,
@@ -73,7 +73,6 @@ function getStateFromQueryString() {
   };
 }
 
-
 class SynthContainer extends React.Component {
   constructor(props) {
     super(props);
@@ -81,7 +80,7 @@ class SynthContainer extends React.Component {
     const queryState = getStateFromQueryString();
     const { synthConfig } = queryState;
 
-    const audioCtx = new AudioContext();
+    const audioCtx = new AudioContext({ latencyHint: 0 });
 
     this.synthesizer = createSynthesizer(synthConfig, audioCtx);
 
@@ -138,35 +137,41 @@ class SynthContainer extends React.Component {
     const NOTE_SCHEDULING_INTERVAL_MS = 100;
     const NOTE_SCHEDULING_RANGE_MS = 150;
 
-    this.lastScheduledTime = -1;;
+    this.lastScheduledTime = -1;
 
     const scheduleNotes = () => {
       const currentTime = this.getCurrentTime();
       const startTime = currentTime;
       const endTime = startTime + NOTE_SCHEDULING_RANGE_MS / 1000;
 
-      const secondsPerBeat = (60 / (this.tempo * 4));
+      const secondsPerBeat = 60 / (this.tempo * 4);
 
       let nextAttackIndex = Math.ceil(currentTime / secondsPerBeat);
 
       const attacks = [];
 
       const {
-        pattern: {
-          activeSettings,
-          degreeSettings,
-        },
+        pattern: { activeSettings, degreeSettings },
       } = this.state;
 
       while (nextAttackIndex * secondsPerBeat < endTime) {
         if (activeSettings[nextAttackIndex % 16]) {
-          attacks.push([nextAttackIndex, degreeSettings[nextAttackIndex % 16] || 0]);
+          attacks.push([
+            nextAttackIndex,
+            degreeSettings[nextAttackIndex % 16] || 0,
+          ]);
         }
         nextAttackIndex += 1;
       }
 
       attacks.forEach(([attackIndex, degree]) => {
-        this.scheduleAttack({ startTime, endTime, nextAttackTime: attackIndex * secondsPerBeat, timeToRelease: secondsPerBeat * 0.9, degree });
+        this.scheduleAttack({
+          startTime,
+          endTime,
+          nextAttackTime: attackIndex * secondsPerBeat,
+          timeToRelease: secondsPerBeat * 0.9,
+          degree,
+        });
       });
 
       this.lastScheduledTime = endTime;
@@ -179,7 +184,7 @@ class SynthContainer extends React.Component {
     // Fix taken from https://github.com/peers/peerjs/issues/278#issuecomment-107276110
     const pingPeer = () => {
       if (this.peer) {
-        this.peer.socket.send({type: 'ping'});
+        this.peer.socket.send({ type: 'ping' });
       }
 
       setTimeout(pingPeer, 20000);
@@ -197,12 +202,14 @@ class SynthContainer extends React.Component {
         this.setState({ peerId: peer.id });
       },
     );
+    this.audioCtx.resume();
 
     this.peer = peer;
     this.timesync = ts;
   }
 
   becomeLeader() {
+    this.audioCtx.resume();
     this.setState(
       {
         connectedPeerId: '',
@@ -210,7 +217,7 @@ class SynthContainer extends React.Component {
       },
       () => this.connectToPeer(),
     );
-  };
+  }
 
   getCurrentTime() {
     if (!this.timesync) {
@@ -236,7 +243,10 @@ class SynthContainer extends React.Component {
       if (this.keysHeld.length < 1) {
         const frequency = degreeToFrequency(degree);
 
-        this.synthesizer.setVcoFrequencyAtTime(frequency, nextAttackTime - offset);
+        this.synthesizer.setVcoFrequencyAtTime(
+          frequency,
+          nextAttackTime - offset,
+        );
       }
 
       this.synthesizer.scheduleAttackAtTime(nextAttackTime - offset);
@@ -244,29 +254,31 @@ class SynthContainer extends React.Component {
       // Also do release, since we already know when it's going to be and there
       // won't be another attack between this one and the release
       // TODO: this will need to be changed at some point as this ^^^ shouldn't be guaranteed
-      this.synthesizer.scheduleReleaseAtTime(nextAttackTime + timeToRelease - offset);
+      this.synthesizer.scheduleReleaseAtTime(
+        nextAttackTime + timeToRelease - offset,
+      );
     }
   }
 
   pushHistoryUpdate() {
     const {
       synthConfig,
-      pattern: {
-        activeSettings,
-        degreeSettings,
-      },
+      pattern: { activeSettings, degreeSettings },
       sectionsShown,
-    }= this.state;
+    } = this.state;
 
-    const configDiff = Object.entries(synthConfig).reduce((acc, [key, value]) => {
-      if (defaultConfig[key] !== value) {
-        return {
-          ...acc,
-          [key]: value,
-        };
-      }
-      return acc;
-    }, {});
+    const configDiff = Object.entries(synthConfig).reduce(
+      (acc, [key, value]) => {
+        if (defaultConfig[key] !== value) {
+          return {
+            ...acc,
+            [key]: value,
+          };
+        }
+        return acc;
+      },
+      {},
+    );
 
     const na = Object.entries(activeSettings).reduce((acc, [key, value]) => {
       if (value) {
@@ -308,6 +320,7 @@ class SynthContainer extends React.Component {
   }
 
   onKeysChanged() {
+    this.audioCtx.resume();
     if (this.keysHeld.length === 0) {
       if (this.keyIsHeld) {
         this.onReleaseTrigger();
@@ -329,38 +342,41 @@ class SynthContainer extends React.Component {
 
   onReleaseTrigger() {
     const currentTime = this.audioCtx.currentTime;
-
     this.synthesizer.scheduleReleaseAtTime(currentTime);
   }
 
   onNoteDegreeChange(note, degree) {
-    this.setState(({ pattern }) => ({
-      pattern: {
-        ...pattern,
-        degreeSettings: {
-          ...pattern.degreeSettings,
-          [note]: degree,
+    this.setState(
+      ({ pattern }) => ({
+        pattern: {
+          ...pattern,
+          degreeSettings: {
+            ...pattern.degreeSettings,
+            [note]: degree,
+          },
         },
+      }),
+      () => {
+        this.pushHistoryUpdateDebounced();
       },
-    }),
-    () => {
-      this.pushHistoryUpdateDebounced();
-    });
+    );
   }
 
   onNoteActiveChange(note, active) {
-    this.setState(({ pattern }) => ({
-      pattern: {
-        ...pattern,
-        activeSettings: {
-          ...pattern.activeSettings,
-          [note]: active,
+    this.setState(
+      ({ pattern }) => ({
+        pattern: {
+          ...pattern,
+          activeSettings: {
+            ...pattern.activeSettings,
+            [note]: active,
+          },
         },
+      }),
+      () => {
+        this.pushHistoryUpdateDebounced();
       },
-    }),
-    () => {
-      this.pushHistoryUpdateDebounced();
-    });
+    );
   }
 
   setVcoFreq() {
@@ -379,15 +395,17 @@ class SynthContainer extends React.Component {
 
   onConfigChange(key, value) {
     this.synthesizer.updateConfig({ [key]: value });
-    this.setState(({ synthConfig }) => ({
-      synthConfig: {
-        ...synthConfig,
-        [key]: value,
+    this.setState(
+      ({ synthConfig }) => ({
+        synthConfig: {
+          ...synthConfig,
+          [key]: value,
+        },
+      }),
+      () => {
+        this.pushHistoryUpdateDebounced();
       },
-    }),
-    () => {
-      this.pushHistoryUpdateDebounced();
-    });
+    );
   }
 
   onVisibilityChange(sectionsShown) {
@@ -411,16 +429,16 @@ class SynthContainer extends React.Component {
           onChange={this.onVisibilityChange}
         />
         <div>
-          {sectionsShown.keyboard &&
+          {sectionsShown.keyboard && (
             <Keyboard
               pattern={pattern}
               getCurrentTime={this.getCurrentTime}
               tempo={this.tempo}
             />
-          }
+          )}
         </div>
         <div>
-          {sectionsShown.sequencer &&
+          {sectionsShown.sequencer && (
             <Sequencer
               pattern={pattern}
               onNoteActiveChange={this.onNoteActiveChange}
@@ -428,7 +446,7 @@ class SynthContainer extends React.Component {
               getCurrentTime={this.getCurrentTime}
               tempo={this.tempo}
             />
-          }
+          )}
         </div>
         <div className="inline-container">
           <div className="section-container">
@@ -523,7 +541,7 @@ class SynthContainer extends React.Component {
               />
             </div>
           </div>
-          {sectionsShown.modulation &&
+          {sectionsShown.modulation && (
             <div className="section-container">
               <h3>Frequency Modulation</h3>
               <div className="inline-container">
@@ -545,9 +563,9 @@ class SynthContainer extends React.Component {
                 />
               </div>
             </div>
-          }
+          )}
         </div>
-        {sectionsShown.filter &&
+        {sectionsShown.filter && (
           <div className="inline-container">
             <div className="section-container">
               <h3>High Pass Filter</h3>
@@ -573,7 +591,7 @@ class SynthContainer extends React.Component {
                   />
                 </div>
               </div>
-              {sectionsShown.modulation &&
+              {sectionsShown.modulation && (
                 <div>
                   <div className="inline-container">
                     <LabeledKnob
@@ -596,7 +614,7 @@ class SynthContainer extends React.Component {
                     />
                   </div>
                 </div>
-              }
+              )}
             </div>
             <div className="section-container">
               <h3>Low Pass Filter</h3>
@@ -622,7 +640,7 @@ class SynthContainer extends React.Component {
                   />
                 </div>
               </div>
-              {sectionsShown.modulation &&
+              {sectionsShown.modulation && (
                 <div>
                   <div className="inline-container">
                     <LabeledKnob
@@ -645,12 +663,12 @@ class SynthContainer extends React.Component {
                     />
                   </div>
                 </div>
-              }
+              )}
             </div>
           </div>
-        }
+        )}
         <div className="inline-container">
-          {sectionsShown.modulation &&
+          {sectionsShown.modulation && (
             <div className="section-container">
               <h3>LFO</h3>
               <div className="inline-container">
@@ -664,8 +682,8 @@ class SynthContainer extends React.Component {
                 />
               </div>
             </div>
-          }
-          {sectionsShown.modulation &&
+          )}
+          {sectionsShown.modulation && (
             <div className="section-container">
               <h3>Envelope</h3>
               <div className="inline-container">
@@ -707,7 +725,7 @@ class SynthContainer extends React.Component {
                 />
               </div>
             </div>
-          }
+          )}
           <div className="section-container">
             <h3>Oscilloscope</h3>
             <Oscilloscope
@@ -718,31 +736,33 @@ class SynthContainer extends React.Component {
               analyser={this.synthesizer.analyser}
             />
             <h3>Spectrum Analyser</h3>
-            <SpectrumAnalyser
-              analyser={this.synthesizer.analyser}
-            />
+            <SpectrumAnalyser analyser={this.synthesizer.analyser} />
           </div>
         </div>
         <div className="inline-container">
           <div className="section-container">
             <h3>Beat Connection</h3>
-            {!isLeader &&
+            {!isLeader && (
               <label>
                 {'Leader ID:\u00A0'}
-                <input type="text" value={connectedPeerId} onChange={(e) => this.setState({ connectedPeerId: e.target.value })} />
+                <input
+                  type="text"
+                  value={connectedPeerId}
+                  onChange={(e) =>
+                    this.setState({ connectedPeerId: e.target.value })
+                  }
+                />
               </label>
-            }
-            {!isLeader &&
+            )}
+            {!isLeader && (
               <button onClick={this.connectToPeer}>Connect to leader</button>
-            }
-            {!isLeader && !peerId &&
+            )}
+            {!isLeader && !peerId && (
               <div style={{ marginTop: 10 }}>
                 <button onClick={this.becomeLeader}>Become leader</button>
               </div>
-            }
-            {peerId &&
-              <div>ID: {peerId}</div>
-            }
+            )}
+            {peerId && <div>ID: {peerId}</div>}
             <div id="systemTime" />
             <div id="syncTime" />
             <div id="offset" />

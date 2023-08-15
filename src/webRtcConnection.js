@@ -5,9 +5,9 @@ import Peer from 'peerjs';
 // https://github.com/enmasseio/timesync
 export default function connect(peers, audioCtx, onOpen) {
   const domSystemTime = document.getElementById('systemTime');
-  const domSyncTime   = document.getElementById('syncTime');
-  const domOffset     = document.getElementById('offset');
-  const domSyncing    = document.getElementById('syncing');
+  const domSyncTime = document.getElementById('syncTime');
+  const domOffset = document.getElementById('offset');
+  const domSyncing = document.getElementById('syncing');
 
   const ts = timesync.create({
     peers: [], // start empty, will be updated at the start of every synchronization
@@ -23,7 +23,8 @@ export default function connect(peers, audioCtx, onOpen) {
       ts.options.peers = openConnections();
       console.log('syncing with peers [' + ts.options.peers.join(', ') + ']');
       if (ts.options.peers.length) {
-        domSyncing.innerHTML = 'syncing with ' + ts.options.peers.join(', ') + '...';
+        domSyncing.innerHTML =
+          'syncing with ' + ts.options.peers.join(', ') + '...';
       }
     }
     if (state === 'end') {
@@ -39,22 +40,28 @@ export default function connect(peers, audioCtx, onOpen) {
   ts.send = function (id, data) {
     //console.log('send', id, data);
     const all = peer.connections[id];
-    const conn = all && all.filter(function (conn) {
-      return conn.open;
-    })[0];
+    const conn =
+      all &&
+      all.filter(function (conn) {
+        return conn.open;
+      })[0];
 
     if (conn) {
       conn.send(data);
+    } else {
+      console.log(
+        new Error('Cannot send message: not connected to ' + id).toString(),
+      );
     }
-    else {
-      console.log(new Error('Cannot send message: not connected to ' + id).toString());
-    }
+
+    // Ignore timeouts
+    return Promise.resolve();
   };
 
   // show the system time and synced time once a second on screen
   function updateDisplay() {
     domSystemTime.innerText = `Local time: ${audioCtx.currentTime.toFixed(2)}`;
-    domSyncTime.innerText   = `Synced time: ${ts.now().toFixed(2)}`;
+    domSyncTime.innerText = `Synced time: ${ts.now().toFixed(2)}`;
 
     setTimeout(updateDisplay, 100);
   }
@@ -84,31 +91,31 @@ export default function connect(peers, audioCtx, onOpen) {
   function connectToPeers() {
     onOpen(peer);
     peers
-        .filter(function (id) {
-          return !peer.connections || peer.connections[id] === undefined;
-        })
-        .forEach(function (id) {
-          console.log('connecting with ' + id + '...');
-          const conn = peer.connect(id);
-          setupConnection(conn);
-        });
+      .filter(function (id) {
+        return !peer.connections || peer.connections[id] === undefined;
+      })
+      .forEach(function (id) {
+        console.log('connecting with ' + id + '...');
+        const conn = peer.connect(id);
+        setupConnection(conn);
+      });
   }
 
   function setupConnection(conn) {
     conn
-        .on('open', function () {
-          console.log('connected with ' + conn.peer);
-        })
-        .on('data', function(data) {
-          //console.log('receive', conn.peer, data);
-          ts.receive(conn.peer, data);
-        })
-        .on('close', function () {
-          console.log('disconnected from ' + conn.peer);
-        })
-        .on('error', function (err) {
-          console.log('Error', err);
-        });
+      .on('open', function () {
+        console.log('connected with ' + conn.peer);
+      })
+      .on('data', function (data) {
+        //console.log('receive', conn.peer, data);
+        ts.receive(conn.peer, data);
+      })
+      .on('close', function () {
+        console.log('disconnected from ' + conn.peer);
+      })
+      .on('error', function (err) {
+        console.log('Error', err);
+      });
   }
 
   // check whether there are connections missing every 10 sec
@@ -116,6 +123,6 @@ export default function connect(peers, audioCtx, onOpen) {
 
   return {
     peer: peer,
-    ts: ts
+    ts: ts,
   };
 }
